@@ -14,8 +14,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3001"),
   title: "MshaharaPro",
   description: "Tanzania-first payroll and compliance platform for SMEs and accountants.",
+  applicationName: "MshaharaPro",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-icon.svg",
+  },
+  manifest: "/manifest.webmanifest",
+  openGraph: {
+    title: "MshaharaPro",
+    description: "Payroll compliance made simple for Tanzanian SMEs.",
+    siteName: "MshaharaPro",
+    images: [{ url: "/logo.svg", width: 328, height: 80, alt: "MshaharaPro logo" }],
+  },
 };
 
 export default function RootLayout({

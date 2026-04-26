@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, ClipboardCheck, FileText, ShieldCheck, Users, type LucideIcon } from "lucide-react";
+import { BrandLogo, BrandMark } from "@/components/app/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -13,10 +14,24 @@ const sections: { title: string; description: string; icon: LucideIcon }[] = [
 export default function Home() {
   return (
     <main className="min-h-screen bg-background">
+      <header className="border-b">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 md:px-8">
+          <Link href="/" aria-label="MshaharaPro home">
+            <BrandLogo />
+          </Link>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" size="sm"><Link href="/login">Login</Link></Button>
+            <Button asChild size="sm"><Link href="/onboarding">Start setup</Link></Button>
+          </div>
+        </div>
+      </header>
       <section className="border-b">
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 md:grid-cols-[1.15fr_0.85fr] md:px-8 md:py-24">
           <div className="flex flex-col justify-center">
-            <p className="mb-4 text-sm font-medium text-muted-foreground">MshaharaPro</p>
+            <div className="mb-5 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <BrandMark className="h-7 w-7" />
+              Built for Tanzanian payroll teams
+            </div>
             <h1 className="max-w-3xl text-4xl font-semibold tracking-tight md:text-6xl">
               Payroll compliance made simple for Tanzanian SMEs.
             </h1>

@@ -12,7 +12,7 @@ const data = [
 export function PayrollSummaryChart() {
   return (
     <div className="h-72 w-full">
-      <ResponsiveContainer>
+      <ResponsiveContainer minHeight={1} minWidth={1}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="month" />
@@ -25,3 +25,5 @@ export function PayrollSummaryChart() {
     </div>
   );
 }
+
+export default PayrollSummaryChart;

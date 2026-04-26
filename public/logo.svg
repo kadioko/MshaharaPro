@@ -1,0 +1,10 @@
+<svg fill="none" viewBox="0 0 328 80" xmlns="http://www.w3.org/2000/svg">
+  <rect x="8" y="8" width="64" height="64" rx="14" fill="#21745a"/>
+  <path d="M27 22h20l8 8v28H27V22Z" fill="#f8fbf8"/>
+  <path d="M47 22v9h8" stroke="#21745a" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M34 38h14M34 46h11" stroke="#21745a" stroke-width="3" stroke-linecap="round"/>
+  <path d="M52 42c3.8 1.4 6.4 2.2 8 2.4-.2 7.6-2.8 12.4-8 15-5.2-2.6-7.8-7.4-8-15 1.6-.2 4.2-1 8-2.4Z" fill="#fff" stroke="#21745a" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="m48.5 51.2 2.4 2.4 5-6" stroke="#21745a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="92" y="42" fill="#17211d" font-family="Geist, Inter, Arial, sans-serif" font-size="31" font-weight="700" letter-spacing="0">MshaharaPro</text>
+  <text x="94" y="61" fill="#5c6f67" font-family="Geist, Inter, Arial, sans-serif" font-size="13" font-weight="500" letter-spacing=".2">Payroll. Compliance. Records.</text>
+</svg>

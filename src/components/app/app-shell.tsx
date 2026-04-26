@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { BadgeCheck, Building2, ClipboardCheck, FileBarChart, LayoutDashboard, ReceiptText, Settings, Users } from "lucide-react";
+import { Building2, ClipboardCheck, FileBarChart, LayoutDashboard, ReceiptText, Settings, Users } from "lucide-react";
+import { BrandLogo } from "@/components/app/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,11 +21,8 @@ export function AppShell({ children, title, description }: { children: React.Rea
       <div className="min-h-screen bg-background text-foreground">
         <div className="flex min-h-screen">
           <aside className="hidden w-64 border-r bg-card/60 px-4 py-5 lg:block">
-            <Link href="/" className="flex items-center gap-2 font-semibold">
-              <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                <BadgeCheck className="h-5 w-5" />
-              </span>
-              <span>MshaharaPro</span>
+            <Link href="/" aria-label="MshaharaPro home">
+              <BrandLogo />
             </Link>
             <p className="mt-2 text-xs text-muted-foreground">Tanzania-first payroll and compliance</p>
             <Separator className="my-5" />
