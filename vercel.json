@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "mshaharapro-frontend",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "@mshaharapro-backend-url"
+  }
+}

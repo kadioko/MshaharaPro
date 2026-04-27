@@ -4,8 +4,9 @@ MshaharaPro is a Tanzania-first payroll and compliance MVP for SMEs, accountants
 
 ## Stack
 
-- Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui
-- Supabase Auth, Postgres, RLS, and Storage-ready schema
+- **Frontend**: Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui (deployed to Vercel)
+- **Backend**: Express.js API with PDFKit (deployed to Railway)
+- **Database**: Supabase Auth, Postgres, RLS, and Storage-ready schema
 - React Hook Form + Zod validation
 - Recharts dashboards
 - date-fns formatting
@@ -20,6 +21,43 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+### Backend (separate terminal)
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+Backend runs on `http://localhost:3001`.
+
+## Deploy
+
+### Backend to Railway
+
+```bash
+cd backend
+npm install -g @railway/cli
+railway login
+railway link
+railway up
+```
+
+Get the deployed URL and set it as `NEXT_PUBLIC_API_URL` in Vercel.
+
+### Frontend to Vercel
+
+```bash
+npm install -g vercel
+vercel login
+vercel
+```
+
+Set environment variables in Vercel dashboard:
+- `NEXT_PUBLIC_API_URL` - Your Railway backend URL
+- `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anon key
 
 ## Environment variables
 
