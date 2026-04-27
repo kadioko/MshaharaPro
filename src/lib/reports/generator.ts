@@ -27,6 +27,54 @@ export const reportLabels: Record<ReportType, string> = {
 
 export const reportTypes = Object.keys(reportLabels) as ReportType[];
 
+export const reportTemplateNotes: Record<ReportType, { audience: string; reviewStatus: string; requiredFields: string[] }> = {
+  "payroll-summary": {
+    audience: "Owners, directors, payroll managers",
+    reviewStatus: "Operational summary; accountant review recommended before approval.",
+    requiredFields: ["Company", "Payroll month", "Employee count", "Gross pay", "Net pay", "Employer cost"],
+  },
+  "employee-register": {
+    audience: "HR, payroll managers, auditors",
+    reviewStatus: "Internal register; confirm employee identity fields before audit use.",
+    requiredFields: ["Employee number", "Name", "Department", "Job title", "Email", "Phone", "Status"],
+  },
+  paye: {
+    audience: "TRA PAYE preparation",
+    reviewStatus: "Template scaffold. Final TRA filing format must be reviewed by a qualified Tanzanian tax advisor.",
+    requiredFields: ["Employer TIN", "Employee TIN", "Taxable pay", "PAYE withheld", "Payroll month"],
+  },
+  nssf: {
+    audience: "NSSF contribution preparation",
+    reviewStatus: "Template scaffold. Confirm current NSSF schedule format before official remittance.",
+    requiredFields: ["Employer NSSF number", "Employee NSSF number", "Gross pay", "Employee share", "Employer share"],
+  },
+  wcf: {
+    audience: "WCF contribution preparation",
+    reviewStatus: "Template scaffold. Confirm current WCF portal fields before official submission.",
+    requiredFields: ["WCF registration number", "Employee number", "Gross earnings", "WCF contribution"],
+  },
+  sdl: {
+    audience: "TRA SDL preparation",
+    reviewStatus: "Template scaffold. Confirm SDL applicability and current TRA format before submission.",
+    requiredFields: ["Employer TIN", "Employee count", "SDL applicable", "Monthly emoluments", "SDL amount"],
+  },
+  "bank-schedule": {
+    audience: "Bank or mobile-money payment preparation",
+    reviewStatus: "Operational payment schedule; verify bank account details before upload/payment.",
+    requiredFields: ["Employee number", "Name", "Bank", "Account", "Mobile money", "Net pay", "Payment reference"],
+  },
+  "department-cost": {
+    audience: "Management accounts and cost review",
+    reviewStatus: "Internal management report.",
+    requiredFields: ["Department", "Total employer cost"],
+  },
+  "loan-advance": {
+    audience: "Payroll deductions and staff advance tracking",
+    reviewStatus: "Internal schedule; reconcile against signed loan/advance records.",
+    requiredFields: ["Employee number", "Name", "Loan repayment"],
+  },
+};
+
 export function generateReportCsv(
   type: ReportType,
   organization: Organization,

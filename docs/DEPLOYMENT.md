@@ -13,6 +13,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 SUPABASE_PROJECT_REF=your-project-ref
+SENTRY_DSN=optional-sentry-dsn
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` must never be renamed with `NEXT_PUBLIC_`.
@@ -50,8 +51,10 @@ After deployment:
 Before launch, connect one of:
 
 - Vercel Observability and Web Analytics
-- Sentry for Next.js exceptions
+- Sentry for server exceptions by setting `SENTRY_DSN`
 - Supabase dashboard alerts and database logs
+
+The app includes a lightweight optional Sentry-compatible server exception hook in `src/instrumentation.ts`. Monitoring is disabled unless `SENTRY_DSN` is set.
 
 ## Rollback
 

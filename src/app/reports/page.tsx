@@ -2,7 +2,7 @@ import { Download } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { reportLabels, reportTypes } from "@/lib/reports/generator";
+import { reportLabels, reportTemplateNotes, reportTypes } from "@/lib/reports/generator";
 
 export default function ReportsPage() {
   return (
@@ -11,10 +11,17 @@ export default function ReportsPage() {
         {reportTypes.map((report) => (
           <Card key={report}>
             <CardHeader><CardTitle className="text-base">{reportLabels[report]}</CardTitle></CardHeader>
-            <CardContent className="flex gap-2">
-              <Button asChild size="sm" variant="outline"><a href={`/api/reports/${report}?format=csv`}><Download className="h-4 w-4" /> CSV</a></Button>
-              <Button asChild size="sm" variant="outline"><a href={`/api/reports/${report}?format=csv&excel=1`}><Download className="h-4 w-4" /> Excel CSV</a></Button>
-              <Button asChild size="sm"><a href={`/api/reports/${report}?format=pdf`}><Download className="h-4 w-4" /> PDF</a></Button>
+            <CardContent className="space-y-4">
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>{reportTemplateNotes[report].audience}</p>
+                <p>{reportTemplateNotes[report].reviewStatus}</p>
+                <p className="text-xs">Fields: {reportTemplateNotes[report].requiredFields.join(", ")}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild size="sm" variant="outline"><a href={`/api/reports/${report}?format=csv`}><Download className="h-4 w-4" /> CSV</a></Button>
+                <Button asChild size="sm" variant="outline"><a href={`/api/reports/${report}?format=csv&excel=1`}><Download className="h-4 w-4" /> Excel CSV</a></Button>
+                <Button asChild size="sm"><a href={`/api/reports/${report}?format=pdf`}><Download className="h-4 w-4" /> PDF</a></Button>
+              </div>
             </CardContent>
           </Card>
         ))}

@@ -16,6 +16,7 @@ import {
   createInviteSchema,
   inviteSchema,
   payrollAdjustmentSchema,
+  payrollRunSchema,
   employeeSchema,
   statutoryRuleSchema,
 } from "@/lib/validation/schemas";
@@ -222,6 +223,38 @@ export async function addPayrollAdjustmentAction(_prevState: ActionState, formDa
   return { ok: true, message: "Payroll adjustment saved." };
 }
 
+export async function createPayrollRunAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = payrollRunSchema.safeParse({
+    organizationId: formData.get("organizationId"),
+    payrollMonth: formData.get("payrollMonth"),
+  });
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid payroll run." };
+  const denied = await forbidden("payroll:calculate", parsed.data.organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: "Demo payroll run created for preview." };
+
+  const { data: run, error } = await supabase
+    .from("payroll_runs")
+    .insert({
+      organization_id: parsed.data.organizationId,
+      payroll_month: `${parsed.data.payrollMonth}-01`,
+      status: "Draft",
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, message: error.message };
+  await writeAuditLog({
+    organizationId: parsed.data.organizationId,
+    action: "Payroll run created",
+    entityType: "payroll_run",
+    entityId: run.id,
+    afterValue: parsed.data,
+  });
+  revalidatePath("/payroll");
+  return { ok: true, message: "Payroll run created.", redirectTo: `/payroll/${run.id}` };
+}
+
 export async function createEmployeeAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const organizationId = String(formData.get("organizationId") ?? "");
   const parsed = employeeSchema.safeParse({
@@ -333,6 +366,27 @@ export async function deactivateEmployeeAction(employeeId: string, organizationI
   });
   revalidatePath("/employees");
   return { ok: true, message: "Employee deactivated." };
+}
+
+export async function reactivateEmployeeAction(employeeId: string, organizationId: string): Promise<ActionState> {
+  const denied = await forbidden("employee:write", organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: "Demo employee reactivated for preview." };
+  const { data: beforeValue } = await supabase.from("employees").select("*").eq("id", employeeId).single();
+  const { error } = await supabase.from("employees").update({ active: true }).eq("id", employeeId);
+  if (error) return { ok: false, message: error.message };
+  await writeAuditLog({
+    organizationId,
+    action: "Employee reactivated",
+    entityType: "employee",
+    entityId: employeeId,
+    beforeValue: beforeValue ?? null,
+    afterValue: { active: true },
+  });
+  revalidatePath("/employees");
+  revalidatePath(`/employees/${employeeId}`);
+  return { ok: true, message: "Employee reactivated." };
 }
 
 export async function deleteInviteAction(inviteId: string, organizationId: string): Promise<ActionState> {

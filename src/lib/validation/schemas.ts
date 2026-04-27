@@ -44,6 +44,11 @@ export const payrollAdjustmentSchema = z.object({
   reason: z.string().min(8, "A reason is required for audit history."),
 });
 
+export const payrollRunSchema = z.object({
+  organizationId: z.string().min(1),
+  payrollMonth: z.string().regex(/^\d{4}-\d{2}$/, "Use YYYY-MM payroll month."),
+});
+
 export const authSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),

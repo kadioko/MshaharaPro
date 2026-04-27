@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
-import { uploadEmployeeDocumentAction } from "@/app/actions";
+import { deactivateEmployeeAction, reactivateEmployeeAction, updateEmployeeAction, uploadEmployeeDocumentAction } from "@/app/actions";
 import { ActionForm } from "@/components/app/action-form";
 import { AppShell } from "@/components/app/app-shell";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { money, shortDate } from "@/lib/format";
 import { getCurrentSession } from "@/lib/auth/session";
@@ -14,6 +17,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   const employee = employees.find((item) => item.id === id);
   if (!employee) notFound();
   const requiredPermission = session?.role === "employee" && employee.email === session.email ? "employee:self" : "employee:read";
+  const canEditEmployee = session?.role !== "employee";
 
   return (
     <AppShell title={employee.fullName} description={`${employee.jobTitle} · ${employee.department}`} requiredPermission={requiredPermission}>
@@ -42,6 +46,42 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
         </TabsContent>
         <TabsContent value="audit"><Detail title="Audit history" rows={[["Created", "Seeded sample record"], ["Last salary change", "Tracked in audit logs"]]} /></TabsContent>
       </Tabs>
+      {canEditEmployee ? <Card className="mt-6">
+        <CardHeader><CardTitle>Edit employee</CardTitle></CardHeader>
+        <CardContent>
+          <ActionForm action={updateEmployeeAction} className="grid gap-4 md:grid-cols-3" submitClassName="md:col-span-3" submitLabel="Save changes">
+            <input name="employeeId" type="hidden" value={employee.id} />
+            <input name="organizationId" type="hidden" value={employee.organizationId} />
+            <div className="space-y-2"><Label htmlFor="employeeNumber">Employee no.</Label><Input id="employeeNumber" name="employeeNumber" defaultValue={employee.employeeNumber} required /></div>
+            <div className="space-y-2"><Label htmlFor="fullName">Full name</Label><Input id="fullName" name="fullName" defaultValue={employee.fullName} required /></div>
+            <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" defaultValue={employee.email} required /></div>
+            <div className="space-y-2"><Label htmlFor="phone">Phone</Label><Input id="phone" name="phone" defaultValue={employee.phone} required /></div>
+            <div className="space-y-2"><Label htmlFor="nida">NIDA</Label><Input id="nida" name="nida" defaultValue={employee.nida} /></div>
+            <div className="space-y-2"><Label htmlFor="tin">TIN</Label><Input id="tin" name="tin" defaultValue={employee.tin} /></div>
+            <div className="space-y-2"><Label htmlFor="nssfNumber">NSSF no.</Label><Input id="nssfNumber" name="nssfNumber" defaultValue={employee.nssfNumber} /></div>
+            <div className="space-y-2"><Label htmlFor="jobTitle">Job title</Label><Input id="jobTitle" name="jobTitle" defaultValue={employee.jobTitle} required /></div>
+            <div className="space-y-2"><Label htmlFor="department">Department</Label><Input id="department" name="department" defaultValue={employee.department} required /></div>
+            <div className="space-y-2"><Label htmlFor="employmentType">Employment type</Label><select className="h-9 rounded-md border bg-background px-3 text-sm" id="employmentType" name="employmentType" defaultValue={employee.employmentType}><option value="permanent">Permanent</option><option value="contract">Contract</option><option value="casual">Casual</option><option value="part-time">Part-time</option></select></div>
+            <div className="space-y-2"><Label htmlFor="startDate">Start date</Label><Input id="startDate" name="startDate" type="date" defaultValue={employee.startDate} required /></div>
+            <div className="space-y-2"><Label htmlFor="basicSalary">Basic salary</Label><Input id="basicSalary" name="basicSalary" type="number" defaultValue={employee.basicSalary} required /></div>
+            <div className="space-y-2"><Label htmlFor="allowances">Allowances</Label><Input id="allowances" name="allowances" type="number" defaultValue={employee.allowances} /></div>
+            <div className="space-y-2"><Label htmlFor="bankName">Bank</Label><Input id="bankName" name="bankName" defaultValue={employee.bankName} /></div>
+            <div className="space-y-2"><Label htmlFor="bankAccountNumber">Bank account</Label><Input id="bankAccountNumber" name="bankAccountNumber" defaultValue={employee.bankAccountNumber} /></div>
+            <div className="space-y-2"><Label htmlFor="mobileMoneyNumber">Mobile money</Label><Input id="mobileMoneyNumber" name="mobileMoneyNumber" defaultValue={employee.mobileMoneyNumber} /></div>
+            <input name="active" type="hidden" value={employee.active ? "on" : "off"} />
+          </ActionForm>
+          <form className="mt-4" action={async () => {
+            "use server";
+            if (employee.active) {
+              await deactivateEmployeeAction(employee.id, employee.organizationId);
+            } else {
+              await reactivateEmployeeAction(employee.id, employee.organizationId);
+            }
+          }}>
+            <Button variant="outline" size="sm">{employee.active ? "Deactivate employee" : "Reactivate employee"}</Button>
+          </form>
+        </CardContent>
+      </Card> : null}
     </AppShell>
   );
 }
