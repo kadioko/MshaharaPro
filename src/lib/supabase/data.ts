@@ -122,6 +122,79 @@ export async function getPayrollRunItems(payrollRunId: string): Promise<PayrollL
   }));
 }
 
+export async function getPayrollAdjustments(payrollRunId?: string) {
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return [];
+  let query = supabase.from("payroll_adjustments").select("*").order("created_at", { ascending: false });
+  if (payrollRunId) query = query.eq("payroll_run_id", payrollRunId);
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: row.id,
+    organizationId: row.organization_id,
+    payrollRunId: row.payroll_run_id ?? undefined,
+    employeeId: row.employee_id,
+    type: row.type as "earning" | "deduction",
+    label: row.label,
+    amount: Number(row.amount),
+    reason: row.reason,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function getInvites(organizationId?: string) {
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return [];
+  let query = supabase.from("invites").select("*").order("created_at", { ascending: false });
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: row.id,
+    organizationId: row.organization_id,
+    email: row.email,
+    role: row.role,
+    token: row.token,
+    expiresAt: row.expires_at,
+    acceptedAt: row.accepted_at ?? undefined,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function getDocuments(employeeId?: string) {
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return [];
+  let query = supabase.from("documents").select("*").order("created_at", { ascending: false });
+  if (employeeId) query = query.eq("employee_id", employeeId);
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: row.id,
+    organizationId: row.organization_id,
+    employeeId: row.employee_id ?? undefined,
+    documentType: row.document_type,
+    storagePath: row.storage_path,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function getStatutoryRuleVersions(ruleId?: string) {
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return [];
+  let query = supabase.from("statutory_rule_versions").select("*").order("created_at", { ascending: false });
+  if (ruleId) query = query.eq("statutory_rule_id", ruleId);
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: row.id,
+    statutoryRuleId: row.statutory_rule_id,
+    changedBy: row.changed_by ?? undefined,
+    beforeValue: row.before_value,
+    afterValue: row.after_value,
+    createdAt: row.created_at,
+  }));
+}
+
 export async function getStatutoryRules(): Promise<StatutoryRule[]> {
   const supabase = await tryCreateSupabaseServerClient();
   if (!supabase) return initialStatutoryRules;

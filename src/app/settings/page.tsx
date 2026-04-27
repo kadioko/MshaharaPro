@@ -1,16 +1,20 @@
 import Link from "next/link";
-import { createInviteAction, saveCompanySettingsAction, uploadCompanyLogoAction } from "@/app/actions";
+import { createInviteAction, deleteInviteAction, resendInviteAction, saveCompanySettingsAction, uploadCompanyLogoAction } from "@/app/actions";
+import { ActionMessageForm } from "@/components/app/action-message-form";
 import { ActionForm } from "@/components/app/action-form";
 import { AppShell } from "@/components/app/app-shell";
+import { CopyInviteButton } from "@/components/app/copy-invite-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { getOrganizations } from "@/lib/supabase/data";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getInvites, getOrganizations } from "@/lib/supabase/data";
 
 export default async function SettingsPage() {
   const [company] = await getOrganizations();
+  const invites = await getInvites(company.id);
 
   return (
     <AppShell title="Settings" description="Company profile, role access, payroll preferences, uploads, and compliance disclaimers." requiredPermission="company:update">
@@ -59,6 +63,38 @@ export default async function SettingsPage() {
               <div className="space-y-2"><Label htmlFor="invite-email">Email</Label><Input id="invite-email" name="email" type="email" required /></div>
               <div className="space-y-2"><Label htmlFor="invite-role">Role</Label><select className="h-8 rounded-md border bg-background px-3 text-sm" id="invite-role" name="role" defaultValue="payroll_manager"><option value="accountant">Accountant</option><option value="company_owner">Company owner</option><option value="payroll_manager">Payroll manager</option><option value="employee">Employee</option></select></div>
             </ActionForm>
+            <div className="mt-6 overflow-x-auto">
+              <Table>
+                <TableHeader><TableRow><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead>Expires</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {invites.map((invite) => (
+                    <TableRow key={invite.id}>
+                      <TableCell className="font-medium">{invite.email}<p className="text-xs text-muted-foreground">{invite.token}</p></TableCell>
+                      <TableCell className="capitalize">{String(invite.role).replaceAll("_", " ")}</TableCell>
+                      <TableCell>{invite.acceptedAt ? "Accepted" : "Pending"}</TableCell>
+                      <TableCell>{new Date(invite.expiresAt).toLocaleDateString()}</TableCell>
+                      <TableCell className="flex flex-wrap gap-2">
+                        <CopyInviteButton token={invite.token} />
+                        {!invite.acceptedAt ? (
+                          <>
+                            <ActionMessageForm action={resendInviteAction} label="Resend">
+                              <input name="inviteId" type="hidden" value={invite.id} />
+                              <input name="organizationId" type="hidden" value={invite.organizationId} />
+                            </ActionMessageForm>
+                            <form action={async () => {
+                              "use server";
+                              await deleteInviteAction(invite.id, invite.organizationId);
+                            }}>
+                              <Button size="sm" variant="outline">Revoke</Button>
+                            </form>
+                          </>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       </div>

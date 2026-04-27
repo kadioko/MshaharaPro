@@ -8,6 +8,7 @@ import { requireAppPermission } from "@/lib/auth/session";
 import { calculatePayrollRun } from "@/lib/payroll/calculator";
 import { employeeToRows, organizationToRow, statutoryRuleToRow } from "@/lib/supabase/mappers";
 import { uploadStorageFile } from "@/lib/supabase/storage";
+import { createSignedStorageUrl } from "@/lib/supabase/storage";
 import { getEmployees, getOrganizations, getStatutoryRules } from "@/lib/supabase/data";
 import { tryCreateSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -25,6 +26,7 @@ export type ActionState = {
   ok: boolean;
   message: string;
   redirectTo?: string;
+  url?: string;
 };
 
 const noSupabase: ActionState = {
@@ -223,6 +225,45 @@ export async function addPayrollAdjustmentAction(_prevState: ActionState, formDa
   return { ok: true, message: "Payroll adjustment saved." };
 }
 
+export async function updatePayrollAdjustmentAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const adjustmentId = String(formData.get("adjustmentId") ?? "");
+  const parsed = payrollAdjustmentSchema.safeParse({
+    organizationId: formData.get("organizationId"),
+    payrollRunId: formData.get("payrollRunId") || undefined,
+    employeeId: formData.get("employeeId"),
+    type: formData.get("type"),
+    label: formData.get("label"),
+    amount: formData.get("amount"),
+    reason: formData.get("reason"),
+  });
+  if (!adjustmentId) return { ok: false, message: "Missing adjustment." };
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid adjustment." };
+  const denied = await forbidden("payroll:calculate", parsed.data.organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: "Demo adjustment updated for preview." };
+
+  const { data: beforeValue } = await supabase.from("payroll_adjustments").select("*").eq("id", adjustmentId).single();
+  const { error } = await supabase.from("payroll_adjustments").update({
+    employee_id: parsed.data.employeeId,
+    type: parsed.data.type,
+    label: parsed.data.label,
+    amount: parsed.data.amount,
+    reason: parsed.data.reason,
+  }).eq("id", adjustmentId);
+  if (error) return { ok: false, message: error.message };
+  await writeAuditLog({
+    organizationId: parsed.data.organizationId,
+    action: "Manual adjustment updated",
+    entityType: "payroll_adjustment",
+    entityId: adjustmentId,
+    beforeValue: beforeValue ?? null,
+    afterValue: parsed.data,
+  });
+  if (parsed.data.payrollRunId) revalidatePath(`/payroll/${parsed.data.payrollRunId}`);
+  return { ok: true, message: "Adjustment updated." };
+}
+
 export async function createPayrollRunAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = payrollRunSchema.safeParse({
     organizationId: formData.get("organizationId"),
@@ -404,7 +445,28 @@ export async function deleteInviteAction(inviteId: string, organizationId: strin
     entityId: inviteId,
     beforeValue: beforeValue ?? null,
   });
+  revalidatePath("/settings");
   return { ok: true, message: "Invite revoked." };
+}
+
+export async function deletePayrollAdjustmentAction(adjustmentId: string, organizationId: string, payrollRunId?: string): Promise<ActionState> {
+  const denied = await forbidden("payroll:calculate", organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: "Demo adjustment deleted for preview." };
+  const { data: beforeValue } = await supabase.from("payroll_adjustments").select("*").eq("id", adjustmentId).single();
+  const { error } = await supabase.from("payroll_adjustments").delete().eq("id", adjustmentId);
+  if (error) return { ok: false, message: error.message };
+  await writeAuditLog({
+    organizationId,
+    action: "Manual adjustment deleted",
+    entityType: "payroll_adjustment",
+    entityId: adjustmentId,
+    beforeValue: beforeValue ?? null,
+  });
+  if (payrollRunId) revalidatePath(`/payroll/${payrollRunId}`);
+  revalidatePath("/payroll");
+  return { ok: true, message: "Adjustment deleted." };
 }
 
 export async function deleteDocumentAction(documentId: string, organizationId: string): Promise<ActionState> {
@@ -423,7 +485,63 @@ export async function deleteDocumentAction(documentId: string, organizationId: s
     entityId: documentId,
     beforeValue: beforeValue ?? null,
   });
+  revalidatePath("/employees");
   return { ok: true, message: "Document deleted." };
+}
+
+export async function getDocumentDownloadLinkAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const storagePath = String(formData.get("storagePath") ?? "");
+  if (!storagePath) return { ok: false, message: "Missing document path." };
+  const signed = await createSignedStorageUrl("documents", storagePath);
+  if (!signed.ok || !signed.url) return { ok: false, message: signed.error ?? "Could not create download link." };
+  return { ok: true, message: "Secure link ready for 10 minutes.", url: signed.url };
+}
+
+export async function resendInviteAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const inviteId = String(formData.get("inviteId") ?? "");
+  const organizationId = String(formData.get("organizationId") ?? "");
+  if (!inviteId || !organizationId) return { ok: false, message: "Missing invite." };
+  const denied = await forbidden("company:update", organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: "Demo invite resend prepared for preview." };
+
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
+  const { data: invite, error } = await supabase
+    .from("invites")
+    .update({ expires_at: expiresAt })
+    .eq("id", inviteId)
+    .select("id, token, email, role")
+    .single();
+  if (error) return { ok: false, message: error.message };
+  await writeAuditLog({
+    organizationId,
+    action: "Invite resent",
+    entityType: "invite",
+    entityId: invite.id,
+    afterValue: { email: invite.email, role: invite.role, expiresAt },
+  });
+  revalidatePath("/settings");
+  return { ok: true, message: `Invite refreshed. Token: ${invite.token}` };
+}
+
+export async function transitionPayrollRunWithCommentAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const payrollRunId = String(formData.get("payrollRunId") ?? "");
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const status = String(formData.get("status") ?? "") as "Pending Approval" | "Approved" | "Locked" | "Paid" | "Cancelled";
+  const comment = String(formData.get("comment") ?? "").trim();
+  if (!payrollRunId || !organizationId || !status) return { ok: false, message: "Missing payroll transition details." };
+  const result = await transitionPayrollRunAction(payrollRunId, organizationId, status);
+  if (result.ok && comment) {
+    await writeAuditLog({
+      organizationId,
+      action: `Payroll comment: ${status}`,
+      entityType: "payroll_run",
+      entityId: payrollRunId,
+      afterValue: { comment },
+    });
+  }
+  return result;
 }
 
 export async function createInviteAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {

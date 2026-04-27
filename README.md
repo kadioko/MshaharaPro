@@ -119,7 +119,9 @@ Do not treat these values as final statutory advice.
 | [User Guide](docs/USER_GUIDE.md) | User types, workflows, and best practices |
 | [Business Strategy](docs/BUSINESS_STRATEGY.md) | Positioning, pricing direction, go-to-market, and launch checklist |
 | [Statutory Report Templates](docs/STATUTORY_REPORT_TEMPLATES.md) | Template fields and accountant-review checklist for statutory reports |
+| [Accountant Review Packet](docs/ACCOUNTANT_REVIEW_PACKET.md) | Sign-off worksheet for PAYE/NSSF/WCF/SDL review |
 | [Security Operations](docs/SECURITY_OPERATIONS.md) | Token cleanup, Vercel envs, monitoring, and release checks |
+| [Product Roadmap](docs/PRODUCT_ROADMAP.md) | Role QA, workflow checklist, CRUD backlog, and next priorities |
 | [Agent Rules](docs/AGENTS.md) | Next.js agent guidelines |
 
 ## Tests

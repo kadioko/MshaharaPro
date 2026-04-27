@@ -1,19 +1,21 @@
 import { notFound } from "next/navigation";
-import { deactivateEmployeeAction, reactivateEmployeeAction, updateEmployeeAction, uploadEmployeeDocumentAction } from "@/app/actions";
+import { deactivateEmployeeAction, deleteDocumentAction, reactivateEmployeeAction, updateEmployeeAction, uploadEmployeeDocumentAction } from "@/app/actions";
 import { ActionForm } from "@/components/app/action-form";
+import { DocumentLinkAction } from "@/components/app/document-link-action";
 import { AppShell } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { money, shortDate } from "@/lib/format";
 import { getCurrentSession } from "@/lib/auth/session";
-import { getEmployees } from "@/lib/supabase/data";
+import { getDocuments, getEmployees } from "@/lib/supabase/data";
 
 export default async function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [session, employees] = await Promise.all([getCurrentSession(), getEmployees()]);
+  const [session, employees, documents] = await Promise.all([getCurrentSession(), getEmployees(), getDocuments(id)]);
   const employee = employees.find((item) => item.id === id);
   if (!employee) notFound();
   const requiredPermission = session?.role === "employee" && employee.email === session.email ? "employee:self" : "employee:read";
@@ -31,7 +33,34 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
         <TabsContent value="loans"><Detail title="Loans/advances" rows={[["Current balance", money(0)], ["Repayment", "No active repayment schedule"]]} /></TabsContent>
         <TabsContent value="payslips"><Detail title="Payslips" rows={[["April 2026", "Draft payslip available after payroll approval"]]} /></TabsContent>
         <TabsContent value="documents">
-          <Detail title="Documents" rows={[["NIDA copy", "Storage-ready via Supabase Storage"], ["Contract", "Not uploaded"]]} />
+          <Card className="mt-4">
+            <CardHeader><CardTitle>Documents</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader><TableRow><TableHead>Type</TableHead><TableHead>Uploaded</TableHead><TableHead>Path</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {documents.map((document) => (
+                    <TableRow key={document.id}>
+                      <TableCell className="font-medium">{document.documentType}</TableCell>
+                      <TableCell>{new Date(document.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell className="max-w-xs truncate text-xs text-muted-foreground">{document.storagePath}</TableCell>
+                      <TableCell className="flex gap-2">
+                        <DocumentLinkAction storagePath={document.storagePath} />
+                        {canEditEmployee ? (
+                          <form action={async () => {
+                            "use server";
+                            await deleteDocumentAction(document.id, document.organizationId);
+                          }}>
+                            <Button size="sm" variant="outline">Delete</Button>
+                          </form>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
           <Card className="mt-4">
             <CardHeader><CardTitle>Upload document</CardTitle></CardHeader>
             <CardContent>
