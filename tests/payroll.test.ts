@@ -30,6 +30,8 @@ describe("role permission helpers", () => {
   it("restricts payroll rules admin features", () => {
     expect(canManagePayrollRules("platform_admin")).toBe(true);
     expect(canManagePayrollRules("accountant")).toBe(false);
+    expect(can("platform_admin", "rules:manage")).toBe(true);
+    expect(can("accountant", "rules:manage")).toBe(false);
   });
 
   it("allows accountants to submit payroll but not employees", () => {

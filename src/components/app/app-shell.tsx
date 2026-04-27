@@ -6,21 +6,32 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { can } from "@/lib/permissions";
-import { getCurrentSession } from "@/lib/auth/session";
+import { getCurrentSession, hasAppPermission } from "@/lib/auth/session";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, permission: "company:read" },
   { href: "/companies", label: "Companies", icon: Building2, permission: "company:read" },
   { href: "/employees", label: "Employees", icon: Users, permission: "employee:read" },
-  { href: "/payroll", label: "Payroll", icon: ReceiptText, permission: "payroll:calculate" },
+  { href: "/payroll", label: "Payroll", icon: ReceiptText, permission: "payroll:read" },
   { href: "/compliance", label: "Compliance", icon: ClipboardCheck, permission: "reports:export" },
   { href: "/reports", label: "Reports", icon: FileBarChart, permission: "reports:export" },
   { href: "/settings", label: "Settings", icon: Settings, permission: "company:update" },
 ];
 
-export async function AppShell({ children, title, description }: { children: React.ReactNode; title: string; description: string }) {
+export async function AppShell({
+  children,
+  title,
+  description,
+  requiredPermission,
+}: {
+  children: React.ReactNode;
+  title: string;
+  description: string;
+  requiredPermission?: string;
+}) {
   const session = await getCurrentSession();
   const visibleNav = session ? nav.filter((item) => can(session.role, item.permission)) : nav;
+  const allowed = requiredPermission ? await hasAppPermission(requiredPermission) : true;
 
   return (
     <TooltipProvider>
@@ -79,7 +90,16 @@ export async function AppShell({ children, title, description }: { children: Rea
                 </div>
               </div>
             </header>
-            <div className="flex-1 px-4 py-6 md:px-8">{children}</div>
+            <div className="flex-1 px-4 py-6 md:px-8">
+              {allowed ? children : (
+                <div className="rounded-md border bg-card p-6">
+                  <h2 className="text-lg font-semibold">Access restricted</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Your current role does not have permission to open this area.
+                  </p>
+                </div>
+              )}
+            </div>
             <footer className="border-t px-4 py-4 text-xs text-muted-foreground md:px-8">
               Payroll calculations should be reviewed by a qualified accountant or tax advisor before submission.
             </footer>

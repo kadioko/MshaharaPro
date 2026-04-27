@@ -11,7 +11,7 @@ export default async function PayrollPage() {
   const [organizations, payrollRuns] = await Promise.all([getOrganizations(), getPayrollRuns()]);
 
   return (
-    <AppShell title="Payroll runs" description="Calculate, review, approve, lock, generate payslips, and mark payroll as paid.">
+    <AppShell title="Payroll runs" description="Calculate, review, approve, lock, generate payslips, and mark payroll as paid." requiredPermission="payroll:read">
       <Card>
         <CardHeader><CardTitle>Monthly runs</CardTitle></CardHeader>
         <CardContent>

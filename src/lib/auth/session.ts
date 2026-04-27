@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { getDemoAccountByEmail, type DemoAccount } from "@/lib/demo-accounts";
 import type { UserRole } from "@/lib/types";
 import { tryCreateSupabaseServerClient } from "@/lib/supabase/server";
+import { can } from "@/lib/permissions";
 
 export const DEMO_SESSION_COOKIE = "mshaharapro_demo_session";
 
@@ -45,4 +46,34 @@ export function demoAccountToSession(account: DemoAccount): AppSession {
     organization: account.organization,
     source: "demo",
   };
+}
+
+export async function hasAppPermission(permission: string, organizationId?: string) {
+  const session = await getCurrentSession();
+  if (!session) return false;
+
+  if (session.source === "demo") {
+    return can(session.role, permission);
+  }
+
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase || !organizationId) return can(session.role, permission);
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { data: membership } = await supabase
+    .from("organization_members")
+    .select("role")
+    .eq("organization_id", organizationId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  return can((membership?.role as AppSession["role"] | undefined) ?? session.role, permission);
+}
+
+export async function requireAppPermission(permission: string, organizationId?: string) {
+  return hasAppPermission(permission, organizationId);
 }

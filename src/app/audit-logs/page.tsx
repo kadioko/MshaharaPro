@@ -8,7 +8,7 @@ export default async function AuditLogsPage() {
   const auditLogs = await getAuditLogs();
 
   return (
-    <AppShell title="Audit logs" description="Audit-ready history for employee, salary, payroll, payslip, and report actions.">
+    <AppShell title="Audit logs" description="Audit-ready history for employee, salary, payroll, payslip, and report actions." requiredPermission="company:update">
       <Card>
         <CardHeader><CardTitle>Recent actions</CardTitle></CardHeader>
         <CardContent>

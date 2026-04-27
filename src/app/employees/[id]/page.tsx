@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { uploadEmployeeDocumentAction } from "@/app/actions";
+import { ActionForm } from "@/components/app/action-form";
 import { AppShell } from "@/components/app/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,7 +14,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   if (!employee) notFound();
 
   return (
-    <AppShell title={employee.fullName} description={`${employee.jobTitle} · ${employee.department}`}>
+    <AppShell title={employee.fullName} description={`${employee.jobTitle} · ${employee.department}`} requiredPermission="employee:read">
       <Tabs defaultValue="personal">
         <TabsList className="flex h-auto flex-wrap justify-start">
           {["personal", "compensation", "deductions", "loans", "payslips", "documents", "audit"].map((tab) => <TabsTrigger key={tab} value={tab}>{tab}</TabsTrigger>)}
@@ -22,7 +24,20 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
         <TabsContent value="deductions"><Detail title="Deductions" rows={[["Statutory", "PAYE and NSSF calculated from configurable rules"], ["Other deductions", "Manual adjustments require reason"]]} /></TabsContent>
         <TabsContent value="loans"><Detail title="Loans/advances" rows={[["Current balance", money(0)], ["Repayment", "No active repayment schedule"]]} /></TabsContent>
         <TabsContent value="payslips"><Detail title="Payslips" rows={[["April 2026", "Draft payslip available after payroll approval"]]} /></TabsContent>
-        <TabsContent value="documents"><Detail title="Documents" rows={[["NIDA copy", "Storage-ready via Supabase Storage"], ["Contract", "Not uploaded"]]} /></TabsContent>
+        <TabsContent value="documents">
+          <Detail title="Documents" rows={[["NIDA copy", "Storage-ready via Supabase Storage"], ["Contract", "Not uploaded"]]} />
+          <Card className="mt-4">
+            <CardHeader><CardTitle>Upload document</CardTitle></CardHeader>
+            <CardContent>
+              <ActionForm action={uploadEmployeeDocumentAction} className="grid gap-4 md:grid-cols-3" submitClassName="md:col-span-3" submitLabel="Upload document">
+                <input name="organizationId" type="hidden" value={employee.organizationId} />
+                <input name="employeeId" type="hidden" value={employee.id} />
+                <div className="space-y-2"><label className="text-sm font-medium" htmlFor="documentType">Document type</label><input className="h-8 rounded-md border bg-background px-3 text-sm" id="documentType" name="documentType" defaultValue="Contract" /></div>
+                <div className="space-y-2 md:col-span-2"><label className="text-sm font-medium" htmlFor="document">File</label><input className="h-8 rounded-md border bg-background px-3 text-sm" id="document" name="document" type="file" /></div>
+              </ActionForm>
+            </CardContent>
+          </Card>
+        </TabsContent>
         <TabsContent value="audit"><Detail title="Audit history" rows={[["Created", "Seeded sample record"], ["Last salary change", "Tracked in audit logs"]]} /></TabsContent>
       </Tabs>
     </AppShell>

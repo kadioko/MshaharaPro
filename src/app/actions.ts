@@ -4,11 +4,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { writeAuditLog } from "@/lib/supabase/audit";
+import { requireAppPermission } from "@/lib/auth/session";
+import { calculatePayrollRun } from "@/lib/payroll/calculator";
 import { employeeToRows, organizationToRow, statutoryRuleToRow } from "@/lib/supabase/mappers";
+import { uploadStorageFile } from "@/lib/supabase/storage";
+import { getEmployees, getOrganizations, getStatutoryRules } from "@/lib/supabase/data";
 import { tryCreateSupabaseServerClient } from "@/lib/supabase/server";
 import {
   authSchema,
   companySchema,
+  createInviteSchema,
   inviteSchema,
   payrollAdjustmentSchema,
   employeeSchema,
@@ -25,6 +30,11 @@ const noSupabase: ActionState = {
   ok: false,
   message: "Supabase is not configured yet. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
 };
+
+async function forbidden(permission: string, organizationId?: string): Promise<ActionState | null> {
+  const allowed = await requireAppPermission(permission, organizationId);
+  return allowed ? null : { ok: false, message: "You do not have permission to perform this action." };
+}
 
 export async function signInWithPassword(values: z.infer<typeof authSchema>): Promise<ActionState> {
   const parsed = authSchema.safeParse(values);
@@ -153,6 +163,8 @@ export async function saveCompanySettingsAction(_prevState: ActionState, formDat
   });
   if (!organizationId) return { ok: false, message: "Missing organization." };
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid settings." };
+  const denied = await forbidden("company:update", organizationId);
+  if (denied) return denied;
   const supabase = await tryCreateSupabaseServerClient();
   if (!supabase) return { ok: true, message: "Demo settings saved for preview." };
 
@@ -182,6 +194,8 @@ export async function addPayrollAdjustmentAction(_prevState: ActionState, formDa
     reason: formData.get("reason"),
   });
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid adjustment." };
+  const denied = await forbidden("payroll:calculate", parsed.data.organizationId);
+  if (denied) return denied;
   const supabase = await tryCreateSupabaseServerClient();
   if (!supabase) return { ok: true, message: "Demo adjustment saved for preview." };
   const {
@@ -231,6 +245,8 @@ export async function createEmployeeAction(_prevState: ActionState, formData: Fo
   });
   if (!organizationId) return { ok: false, message: "Missing organization." };
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid employee." };
+  const denied = await forbidden("employee:write", organizationId);
+  if (denied) return denied;
   const supabase = await tryCreateSupabaseServerClient();
   if (!supabase) return { ok: true, message: "Demo employee saved for preview." };
 
@@ -252,11 +268,162 @@ export async function createEmployeeAction(_prevState: ActionState, formData: Fo
   return { ok: true, message: "Employee saved." };
 }
 
+export async function createInviteAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = createInviteSchema.safeParse({
+    organizationId: formData.get("organizationId"),
+    email: formData.get("email"),
+    role: formData.get("role"),
+  });
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid invite." };
+  const denied = await forbidden("company:update", parsed.data.organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: "Demo invite created for preview." };
+
+  const token = `MSH-${crypto.randomUUID()}`;
+  const { data: invite, error } = await supabase
+    .from("invites")
+    .insert({
+      organization_id: parsed.data.organizationId,
+      email: parsed.data.email,
+      role: parsed.data.role,
+      token,
+      expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, message: error.message };
+  await writeAuditLog({
+    organizationId: parsed.data.organizationId,
+    action: "Invite created",
+    entityType: "invite",
+    entityId: invite.id,
+    afterValue: { email: parsed.data.email, role: parsed.data.role },
+  });
+  return { ok: true, message: `Invite created. Token: ${token}` };
+}
+
+export async function uploadCompanyLogoAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const file = formData.get("logo");
+  if (!organizationId || !(file instanceof File) || file.size === 0) {
+    return { ok: false, message: "Choose a company logo to upload." };
+  }
+  const denied = await forbidden("company:update", organizationId);
+  if (denied) return denied;
+  const path = `${organizationId}/logo-${Date.now()}-${file.name}`;
+  const upload = await uploadStorageFile("logos", path, file, file.type);
+  if (!upload.ok) return { ok: false, message: upload.error ?? "Logo upload failed." };
+
+  const supabase = await tryCreateSupabaseServerClient();
+  if (supabase) {
+    await supabase.from("organizations").update({ logo_path: path }).eq("id", organizationId);
+    await writeAuditLog({
+      organizationId,
+      action: "Company logo uploaded",
+      entityType: "organization",
+      entityId: organizationId,
+      afterValue: { logo_path: path },
+    });
+  }
+  revalidatePath("/settings");
+  return { ok: true, message: "Company logo uploaded." };
+}
+
+export async function uploadEmployeeDocumentAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const employeeId = String(formData.get("employeeId") ?? "");
+  const documentType = String(formData.get("documentType") ?? "document");
+  const file = formData.get("document");
+  if (!organizationId || !employeeId || !(file instanceof File) || file.size === 0) {
+    return { ok: false, message: "Choose an employee document to upload." };
+  }
+  const denied = await forbidden("employee:write", organizationId);
+  if (denied) return denied;
+  const path = `${organizationId}/${employeeId}/${Date.now()}-${file.name}`;
+  const upload = await uploadStorageFile("documents", path, file, file.type);
+  if (!upload.ok) return { ok: false, message: upload.error ?? "Document upload failed." };
+
+  const supabase = await tryCreateSupabaseServerClient();
+  if (supabase) {
+    const { data: document } = await supabase
+      .from("documents")
+      .insert({ organization_id: organizationId, employee_id: employeeId, document_type: documentType, storage_path: path })
+      .select("id")
+      .single();
+    await writeAuditLog({
+      organizationId,
+      action: "Employee document uploaded",
+      entityType: "document",
+      entityId: document?.id,
+      afterValue: { employeeId, documentType, path },
+    });
+  }
+  revalidatePath(`/employees/${employeeId}`);
+  return { ok: true, message: "Employee document uploaded." };
+}
+
+export async function calculateAndPersistPayrollAction(
+  payrollRunId: string,
+  organizationId: string,
+): Promise<ActionState> {
+  const denied = await forbidden("payroll:calculate", organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: "Demo payroll calculated for preview." };
+
+  const [organizations, employees, rules] = await Promise.all([getOrganizations(), getEmployees(), getStatutoryRules()]);
+  const organization = organizations.find((item) => item.id === organizationId);
+  if (!organization) return { ok: false, message: "Organization not found." };
+  const items = calculatePayrollRun(
+    organization,
+    employees.filter((employee) => employee.organizationId === organizationId),
+    [],
+    rules,
+  );
+  await supabase.from("payroll_run_items").delete().eq("payroll_run_id", payrollRunId);
+  const { error } = await supabase.from("payroll_run_items").insert(
+    items.map((item) => ({
+      organization_id: organizationId,
+      payroll_run_id: payrollRunId,
+      employee_id: item.employeeId,
+      basic_salary: item.basicSalary,
+      allowances: item.allowances,
+      overtime: item.overtime,
+      bonuses: item.bonuses,
+      gross_pay: item.grossPay,
+      nssf_employee: item.nssfEmployee,
+      paye: item.paye,
+      other_deductions: item.otherDeductions,
+      loan_repayment: item.loanRepayment,
+      net_pay: item.netPay,
+      employer_nssf: item.employerNssf,
+      wcf: item.wcf,
+      sdl_allocation: item.sdlAllocation,
+      total_employer_cost: item.totalEmployerCost,
+      warnings: item.warnings,
+    })),
+  );
+  if (error) return { ok: false, message: error.message };
+  await writeAuditLog({
+    organizationId,
+    action: "Payroll calculated and persisted",
+    entityType: "payroll_run",
+    entityId: payrollRunId,
+    afterValue: { itemCount: items.length },
+  });
+  revalidatePath(`/payroll/${payrollRunId}`);
+  return { ok: true, message: "Payroll calculated and saved." };
+}
+
 export async function transitionPayrollRunAction(
   payrollRunId: string,
   organizationId: string,
   status: "Pending Approval" | "Approved" | "Locked" | "Paid" | "Cancelled",
 ) {
+  const permission = status === "Pending Approval" ? "payroll:submit" : status === "Approved" || status === "Locked" ? "payroll:approve" : "payroll:calculate";
+  const denied = await forbidden(permission, organizationId);
+  if (denied) return denied;
   const supabase = await tryCreateSupabaseServerClient();
   if (!supabase) return { ok: true, message: `Demo payroll marked ${status}.` };
   const timestampColumn =
@@ -294,6 +461,8 @@ export async function saveStatutoryRuleAction(_prevState: ActionState, formData:
     active: formData.get("active") === "on",
   });
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid payroll rule." };
+  const denied = await forbidden("rules:manage");
+  if (denied) return denied;
   const supabase = await tryCreateSupabaseServerClient();
   if (!supabase) return { ok: true, message: "Demo payroll rule saved for preview." };
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createEmployeeAction } from "@/app/actions";
+import { ActionForm } from "@/components/app/action-form";
 import { AppShell } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,14 +14,11 @@ export default async function EmployeesPage() {
   const [employees, organizations] = await Promise.all([getEmployees(), getOrganizations()]);
 
   return (
-    <AppShell title="Employees" description="Personal records, compensation, deductions, loans, payslips, documents, and audit history.">
+    <AppShell title="Employees" description="Personal records, compensation, deductions, loans, payslips, documents, and audit history." requiredPermission="employee:read">
       <Card className="mb-6">
         <CardHeader><CardTitle>Quick add employee</CardTitle></CardHeader>
         <CardContent>
-          <form action={async (formData) => {
-            "use server";
-            await createEmployeeAction({ ok: false, message: "" }, formData);
-          }} className="grid gap-4 md:grid-cols-4">
+          <ActionForm action={createEmployeeAction} className="grid gap-4 md:grid-cols-4" submitClassName="md:col-span-4" submitLabel="Save employee">
             <input name="organizationId" type="hidden" value={organizations[0].id} />
             <div className="space-y-2"><Label htmlFor="employeeNumber">Employee no.</Label><Input id="employeeNumber" name="employeeNumber" required /></div>
             <div className="space-y-2"><Label htmlFor="fullName">Full name</Label><Input id="fullName" name="fullName" required /></div>
@@ -32,8 +30,7 @@ export default async function EmployeesPage() {
             <div className="space-y-2"><Label htmlFor="basicSalary">Basic salary</Label><Input id="basicSalary" name="basicSalary" type="number" required /></div>
             <input name="employmentType" type="hidden" value="permanent" />
             <input name="allowances" type="hidden" value="0" />
-            <Button className="md:col-span-4">Save employee</Button>
-          </form>
+          </ActionForm>
         </CardContent>
       </Card>
       <Card>

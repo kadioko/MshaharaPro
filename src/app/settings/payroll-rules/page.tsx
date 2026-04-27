@@ -10,7 +10,7 @@ export default async function PayrollRulesPage() {
   const rules = await getStatutoryRules();
 
   return (
-    <AppShell title="Payroll rules admin" description="Configurable rates, thresholds, caps, formula types, notes, effective dates, and active status.">
+    <AppShell title="Payroll rules admin" description="Configurable rates, thresholds, caps, formula types, notes, effective dates, and active status." requiredPermission="rules:manage">
       <Card>
         <CardHeader><CardTitle>Statutory rules</CardTitle></CardHeader>
         <CardContent>

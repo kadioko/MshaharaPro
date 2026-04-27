@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, Download, Lock, Send } from "lucide-react";
-import { transitionPayrollRunAction } from "@/app/actions";
+import { calculateAndPersistPayrollAction, transitionPayrollRunAction } from "@/app/actions";
 import { AppShell } from "@/components/app/app-shell";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -30,9 +30,15 @@ export default async function PayrollDetailPage({ params }: { params: Promise<{ 
   const warnings = items.flatMap((item) => item.warnings.map((warning) => `${runEmployees.find((employee) => employee.id === item.employeeId)?.fullName}: ${warning}`));
 
   return (
-    <AppShell title={`${org.name} payroll`} description={`${monthLabel(run.month)} · configurable statutory calculation preview`}>
+    <AppShell title={`${org.name} payroll`} description={`${monthLabel(run.month)} · configurable statutory calculation preview`} requiredPermission="payroll:read">
       <div className="mb-4 flex flex-wrap gap-2">
         <StatusBadge status={run.status} />
+        <form action={async () => {
+          "use server";
+          await calculateAndPersistPayrollAction(run.id, org.id);
+        }}>
+          <Button size="sm" variant="outline">Calculate and save</Button>
+        </form>
         <form action={async () => {
           "use server";
           await transitionPayrollRunAction(run.id, org.id, "Pending Approval");

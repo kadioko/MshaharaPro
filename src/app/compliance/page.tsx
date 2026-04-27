@@ -17,7 +17,7 @@ const items = [
 
 export default function CompliancePage() {
   return (
-    <AppShell title="Compliance checklist" description="Monthly payroll readiness across statutory reports, payslips, payment files, and locks.">
+    <AppShell title="Compliance checklist" description="Monthly payroll readiness across statutory reports, payslips, payment files, and locks." requiredPermission="reports:export">
       <Card>
         <CardHeader><CardTitle>April 2026 checklist</CardTitle></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">

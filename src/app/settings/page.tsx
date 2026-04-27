@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { saveCompanySettingsAction } from "@/app/actions";
+import { createInviteAction, saveCompanySettingsAction, uploadCompanyLogoAction } from "@/app/actions";
+import { ActionForm } from "@/components/app/action-form";
 import { AppShell } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,15 +13,12 @@ export default async function SettingsPage() {
   const [company] = await getOrganizations();
 
   return (
-    <AppShell title="Settings" description="Company profile, role access, payroll preferences, uploads, and compliance disclaimers.">
+    <AppShell title="Settings" description="Company profile, role access, payroll preferences, uploads, and compliance disclaimers." requiredPermission="company:update">
       <div className="grid gap-6 lg:grid-cols-[1fr_0.7fr]">
         <Card>
           <CardHeader><CardTitle>Company setup</CardTitle><CardDescription>Core statutory and payroll preferences.</CardDescription></CardHeader>
           <CardContent>
-            <form action={async (formData) => {
-              "use server";
-              await saveCompanySettingsAction({ ok: false, message: "" }, formData);
-            }} className="grid gap-4 md:grid-cols-2">
+            <ActionForm action={saveCompanySettingsAction} className="grid gap-4 md:grid-cols-2" submitClassName="md:col-span-2" submitLabel="Save settings">
               <input name="organizationId" type="hidden" value={company.id} />
               <div className="space-y-2"><Label htmlFor="name">Company name</Label><Input id="name" name="name" defaultValue={company.name} required /></div>
               <div className="space-y-2"><Label htmlFor="tin">TIN</Label><Input id="tin" name="tin" defaultValue={company.tin} required /></div>
@@ -33,8 +31,7 @@ export default async function SettingsPage() {
               <div className="space-y-2"><Label htmlFor="payrollMonthStartDay">Payroll month start</Label><Input id="payrollMonthStartDay" name="payrollMonthStartDay" defaultValue={company.payrollMonthStartDay} type="number" /></div>
               <div className="space-y-2"><Label htmlFor="payrollMonthEndDay">Payroll month end</Label><Input id="payrollMonthEndDay" name="payrollMonthEndDay" defaultValue={company.payrollMonthEndDay} type="number" /></div>
               <div className="flex items-center justify-between rounded-md border p-3 md:col-span-2"><Label htmlFor="sdlApplicable" className="text-sm">SDL applicable</Label><Switch id="sdlApplicable" name="sdlApplicable" defaultChecked={company.sdlApplicable} /></div>
-              <Button className="md:col-span-2">Save settings</Button>
-            </form>
+            </ActionForm>
           </CardContent>
         </Card>
         <Card>
@@ -43,6 +40,25 @@ export default async function SettingsPage() {
             <Button asChild variant="outline" className="w-full justify-start"><Link href="/settings/payroll-rules">Payroll rules admin</Link></Button>
             <Button asChild variant="outline" className="w-full justify-start"><Link href="/audit-logs">Audit logs</Link></Button>
             <p className="text-xs text-muted-foreground">Payroll calculations should be reviewed by a qualified accountant or tax advisor before submission.</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Company logo</CardTitle><CardDescription>Upload a logo to Supabase Storage.</CardDescription></CardHeader>
+          <CardContent>
+            <ActionForm action={uploadCompanyLogoAction} className="space-y-4" submitLabel="Upload logo">
+              <input name="organizationId" type="hidden" value={company.id} />
+              <div className="space-y-2"><Label htmlFor="logo">Logo file</Label><Input id="logo" name="logo" type="file" accept="image/*" /></div>
+            </ActionForm>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Invite member</CardTitle><CardDescription>Create an invite for another company user.</CardDescription></CardHeader>
+          <CardContent>
+            <ActionForm action={createInviteAction} className="grid gap-4 md:grid-cols-3" submitClassName="md:col-span-3" submitLabel="Create invite">
+              <input name="organizationId" type="hidden" value={company.id} />
+              <div className="space-y-2"><Label htmlFor="invite-email">Email</Label><Input id="invite-email" name="email" type="email" required /></div>
+              <div className="space-y-2"><Label htmlFor="invite-role">Role</Label><select className="h-8 rounded-md border bg-background px-3 text-sm" id="invite-role" name="role" defaultValue="payroll_manager"><option value="accountant">Accountant</option><option value="company_owner">Company owner</option><option value="payroll_manager">Payroll manager</option><option value="employee">Employee</option></select></div>
+            </ActionForm>
           </CardContent>
         </Card>
       </div>

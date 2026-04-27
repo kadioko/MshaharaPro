@@ -53,6 +53,12 @@ export const inviteSchema = z.object({
   token: z.string().min(8),
 });
 
+export const createInviteSchema = z.object({
+  organizationId: z.string().min(1),
+  email: z.string().email(),
+  role: z.enum(["accountant", "company_owner", "payroll_manager", "employee"]),
+});
+
 export const statutoryRuleSchema = z.object({
   id: z.string().optional(),
   code: z.string().min(2),

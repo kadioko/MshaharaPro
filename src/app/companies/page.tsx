@@ -8,7 +8,7 @@ export default async function CompaniesPage() {
   const [organizations, payrollRuns] = await Promise.all([getOrganizations(), getPayrollRuns()]);
 
   return (
-    <AppShell title="Companies" description="Company setup, statutory registrations, payroll preferences, and client ownership.">
+    <AppShell title="Companies" description="Company setup, statutory registrations, payroll preferences, and client ownership." requiredPermission="company:read">
       <Card>
         <CardHeader><CardTitle>Client companies</CardTitle></CardHeader>
         <CardContent>

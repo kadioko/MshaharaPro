@@ -1,8 +1,8 @@
 import { Building2, MailPlus } from "lucide-react";
 import Link from "next/link";
 import { acceptInviteAction, createOrganizationAction } from "@/app/actions";
+import { ActionForm } from "@/components/app/action-form";
 import { BrandLogo } from "@/components/app/brand-logo";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,10 +24,7 @@ export default function OnboardingPage() {
             <CardDescription>Set up payroll, statutory IDs, and settings.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form action={async (formData) => {
-              "use server";
-              await createOrganizationAction({ ok: false, message: "" }, formData);
-            }} className="space-y-4">
+            <ActionForm action={createOrganizationAction} className="space-y-4" submitLabel="Create company">
             <div className="space-y-2"><Label htmlFor="name">Company name</Label><Input id="name" name="name" placeholder="Kilimanjaro Foods Ltd" required /></div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2"><Label htmlFor="tin">TIN</Label><Input id="tin" name="tin" required /></div>
@@ -49,8 +46,7 @@ export default function OnboardingPage() {
             <div className="flex items-center justify-between rounded-md border p-3">
               <Label htmlFor="sdlApplicable" className="text-sm">SDL applicable</Label><Switch id="sdlApplicable" name="sdlApplicable" />
             </div>
-            <Button className="w-full">Create company</Button>
-            </form>
+            </ActionForm>
           </CardContent>
         </Card>
         <Card>
@@ -60,13 +56,9 @@ export default function OnboardingPage() {
             <CardDescription>For accountants, owners, payroll managers, and employees.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form action={async (formData) => {
-              "use server";
-              await acceptInviteAction({ ok: false, message: "" }, formData);
-            }} className="space-y-4">
+            <ActionForm action={acceptInviteAction} className="space-y-4" submitLabel="Join workspace">
             <div className="space-y-2"><Label htmlFor="token">Invite code</Label><Input id="token" name="token" placeholder="MSH-INVITE-2026" required /></div>
-            <Button variant="outline" className="w-full">Join workspace</Button>
-            </form>
+            </ActionForm>
           </CardContent>
         </Card>
       </div>

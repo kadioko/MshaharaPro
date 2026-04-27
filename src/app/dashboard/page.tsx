@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   const [employees, organizations, payrollRuns] = await Promise.all([getEmployees(), getOrganizations(), getPayrollRuns()]);
 
   return (
-    <AppShell title="Accountant dashboard" description="All client companies, payroll status, missing data, and upcoming compliance work.">
+    <AppShell title="Accountant dashboard" description="All client companies, payroll status, missing data, and upcoming compliance work." requiredPermission="company:read">
       <div className="grid gap-4 md:grid-cols-4">
         <Metric title="Client companies" value={organizations.length} icon={Building2} />
         <Metric title="Active employees" value={employees.filter((item) => item.active).length} icon={Users} />

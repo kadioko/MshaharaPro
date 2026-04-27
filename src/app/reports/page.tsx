@@ -6,7 +6,7 @@ import { reportLabels, reportTypes } from "@/lib/reports/generator";
 
 export default function ReportsPage() {
   return (
-    <AppShell title="Reports" description="Export payroll, statutory, payment, department, and loan reports as CSV or PDF summaries.">
+    <AppShell title="Reports" description="Export payroll, statutory, payment, department, and loan reports as CSV or PDF summaries." requiredPermission="reports:export">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {reportTypes.map((report) => (
           <Card key={report}>
