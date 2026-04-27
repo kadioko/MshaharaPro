@@ -113,6 +113,15 @@ The payroll engine uses configurable rules from `src/lib/payroll/rules.ts` and s
 
 Do not treat these values as final statutory advice.
 
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Test Accounts](docs/TEST_ACCOUNTS.md) | Verified demo accounts & test scenarios |
+| [Deployment](docs/DEPLOYMENT.md) | Railway & Vercel deployment guide |
+| [Architecture](docs/ARCHITECTURE.md) | System design & tech stack details |
+| [Agent Rules](docs/AGENTS.md) | Next.js agent guidelines |
+
 ## Tests
 
 ```bash
