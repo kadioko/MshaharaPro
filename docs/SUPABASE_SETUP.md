@@ -9,9 +9,11 @@
 4. Link and apply the schema:
 
 ```bash
-supabase link --project-ref your-project-ref
+node scripts/run-supabase-cli.mjs link --project-ref your-project-ref
 npm run supabase:apply
 ```
+
+If the Supabase CLI is installed somewhere custom, set `SUPABASE_CLI_PATH` to the executable path before running these commands.
 
 5. Seed demo auth users after confirming you want real users created:
 

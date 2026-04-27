@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "verify": "npm run lint && npm test && npm run build",
-    "supabase:apply": "supabase db push",
+    "supabase:apply": "node scripts/run-supabase-cli.mjs db push",
     "supabase:seed-users": "tsx scripts/seed-supabase-users.ts"
   },
   "dependencies": {
