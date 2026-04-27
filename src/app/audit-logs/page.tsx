@@ -1,10 +1,12 @@
 import { AppShell } from "@/components/app/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { auditLogs } from "@/lib/demo-data";
 import { shortDate } from "@/lib/format";
+import { getAuditLogs } from "@/lib/supabase/data";
 
-export default function AuditLogsPage() {
+export default async function AuditLogsPage() {
+  const auditLogs = await getAuditLogs();
+
   return (
     <AppShell title="Audit logs" description="Audit-ready history for employee, salary, payroll, payslip, and report actions.">
       <Card>

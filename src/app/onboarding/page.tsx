@@ -1,5 +1,6 @@
 import { Building2, MailPlus } from "lucide-react";
 import Link from "next/link";
+import { acceptInviteAction, createOrganizationAction } from "@/app/actions";
 import { BrandLogo } from "@/components/app/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,20 +23,34 @@ export default function OnboardingPage() {
             <CardTitle>Create a company</CardTitle>
             <CardDescription>Set up payroll, statutory IDs, and settings.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2"><Label>Company name</Label><Input placeholder="Kilimanjaro Foods Ltd" /></div>
+          <CardContent>
+            <form action={async (formData) => {
+              "use server";
+              await createOrganizationAction({ ok: false, message: "" }, formData);
+            }} className="space-y-4">
+            <div className="space-y-2"><Label htmlFor="name">Company name</Label><Input id="name" name="name" placeholder="Kilimanjaro Foods Ltd" required /></div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>TIN</Label><Input /></div>
-              <div className="space-y-2"><Label>VRN optional</Label><Input /></div>
+              <div className="space-y-2"><Label htmlFor="tin">TIN</Label><Input id="tin" name="tin" required /></div>
+              <div className="space-y-2"><Label htmlFor="vrn">VRN optional</Label><Input id="vrn" name="vrn" /></div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>NSSF employer number</Label><Input /></div>
-              <div className="space-y-2"><Label>WCF registration number</Label><Input /></div>
+              <div className="space-y-2"><Label htmlFor="nssfEmployerNumber">NSSF employer number</Label><Input id="nssfEmployerNumber" name="nssfEmployerNumber" required /></div>
+              <div className="space-y-2"><Label htmlFor="wcfRegistrationNumber">WCF registration number</Label><Input id="wcfRegistrationNumber" name="wcfRegistrationNumber" required /></div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2"><Label htmlFor="traTaxRegion">TRA tax region</Label><Input id="traTaxRegion" name="traTaxRegion" placeholder="Dar es Salaam" /></div>
+              <div className="space-y-2"><Label htmlFor="businessSector">Business sector</Label><Input id="businessSector" name="businessSector" required /></div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2"><Label htmlFor="employeeCount">Employees</Label><Input id="employeeCount" name="employeeCount" type="number" defaultValue="1" min="0" /></div>
+              <div className="space-y-2"><Label htmlFor="payrollMonthStartDay">Month start</Label><Input id="payrollMonthStartDay" name="payrollMonthStartDay" type="number" defaultValue="1" min="1" max="31" /></div>
+              <div className="space-y-2"><Label htmlFor="payrollMonthEndDay">Month end</Label><Input id="payrollMonthEndDay" name="payrollMonthEndDay" type="number" defaultValue="30" min="1" max="31" /></div>
             </div>
             <div className="flex items-center justify-between rounded-md border p-3">
-              <span className="text-sm">SDL applicable</span><Switch />
+              <Label htmlFor="sdlApplicable" className="text-sm">SDL applicable</Label><Switch id="sdlApplicable" name="sdlApplicable" />
             </div>
             <Button className="w-full">Create company</Button>
+            </form>
           </CardContent>
         </Card>
         <Card>
@@ -44,9 +59,14 @@ export default function OnboardingPage() {
             <CardTitle>Join by invite</CardTitle>
             <CardDescription>For accountants, owners, payroll managers, and employees.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2"><Label>Invite code</Label><Input placeholder="MSH-INVITE-2026" /></div>
+          <CardContent>
+            <form action={async (formData) => {
+              "use server";
+              await acceptInviteAction({ ok: false, message: "" }, formData);
+            }} className="space-y-4">
+            <div className="space-y-2"><Label htmlFor="token">Invite code</Label><Input id="token" name="token" placeholder="MSH-INVITE-2026" required /></div>
             <Button variant="outline" className="w-full">Join workspace</Button>
+            </form>
           </CardContent>
         </Card>
       </div>

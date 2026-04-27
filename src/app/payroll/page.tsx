@@ -4,10 +4,12 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { organizations, payrollRuns } from "@/lib/demo-data";
 import { monthLabel } from "@/lib/format";
+import { getOrganizations, getPayrollRuns } from "@/lib/supabase/data";
 
-export default function PayrollPage() {
+export default async function PayrollPage() {
+  const [organizations, payrollRuns] = await Promise.all([getOrganizations(), getPayrollRuns()]);
+
   return (
     <AppShell title="Payroll runs" description="Calculate, review, approve, lock, generate payslips, and mark payroll as paid.">
       <Card>

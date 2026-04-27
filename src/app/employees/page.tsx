@@ -1,14 +1,41 @@
 import Link from "next/link";
+import { createEmployeeAction } from "@/app/actions";
 import { AppShell } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { employees, organizations } from "@/lib/demo-data";
 import { money } from "@/lib/format";
+import { getEmployees, getOrganizations } from "@/lib/supabase/data";
 
-export default function EmployeesPage() {
+export default async function EmployeesPage() {
+  const [employees, organizations] = await Promise.all([getEmployees(), getOrganizations()]);
+
   return (
     <AppShell title="Employees" description="Personal records, compensation, deductions, loans, payslips, documents, and audit history.">
+      <Card className="mb-6">
+        <CardHeader><CardTitle>Quick add employee</CardTitle></CardHeader>
+        <CardContent>
+          <form action={async (formData) => {
+            "use server";
+            await createEmployeeAction({ ok: false, message: "" }, formData);
+          }} className="grid gap-4 md:grid-cols-4">
+            <input name="organizationId" type="hidden" value={organizations[0].id} />
+            <div className="space-y-2"><Label htmlFor="employeeNumber">Employee no.</Label><Input id="employeeNumber" name="employeeNumber" required /></div>
+            <div className="space-y-2"><Label htmlFor="fullName">Full name</Label><Input id="fullName" name="fullName" required /></div>
+            <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" required /></div>
+            <div className="space-y-2"><Label htmlFor="phone">Phone</Label><Input id="phone" name="phone" required /></div>
+            <div className="space-y-2"><Label htmlFor="jobTitle">Job title</Label><Input id="jobTitle" name="jobTitle" required /></div>
+            <div className="space-y-2"><Label htmlFor="department">Department</Label><Input id="department" name="department" required /></div>
+            <div className="space-y-2"><Label htmlFor="startDate">Start date</Label><Input id="startDate" name="startDate" type="date" required /></div>
+            <div className="space-y-2"><Label htmlFor="basicSalary">Basic salary</Label><Input id="basicSalary" name="basicSalary" type="number" required /></div>
+            <input name="employmentType" type="hidden" value="permanent" />
+            <input name="allowances" type="hidden" value="0" />
+            <Button className="md:col-span-4">Save employee</Button>
+          </form>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader><CardTitle>Employee register</CardTitle></CardHeader>
         <CardContent>

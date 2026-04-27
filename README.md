@@ -5,7 +5,7 @@ MshaharaPro is a Tanzania-first payroll and compliance MVP for SMEs, accountants
 ## Stack
 
 - **Frontend**: Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui (deployed to Vercel)
-- **Backend**: Express.js API with PDFKit (deployed to Railway)
+- **Backend**: Next.js route handlers/server actions. Railway/Express is optional legacy infrastructure.
 - **Database**: Supabase Auth, Postgres, RLS, and Storage-ready schema
 - React Hook Form + Zod validation
 - Recharts dashboards
@@ -22,29 +22,13 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-### Backend (separate terminal)
-
-```bash
-cd backend
-npm install
-npm run dev
-```
-
-Backend runs on `http://localhost:3001`.
+The active MVP backend runs inside the Next.js app through route handlers and server actions.
 
 ## Deploy
 
-### Backend to Railway
+### Backend architecture
 
-```bash
-cd backend
-npm install -g @railway/cli
-railway login
-railway link
-railway up
-```
-
-Get the deployed URL and set it as `NEXT_PUBLIC_API_URL` in Vercel.
+The active backend is the Next.js app. See [Backend Architecture](docs/BACKEND_ARCHITECTURE.md).
 
 ### Frontend to Vercel
 
@@ -55,7 +39,7 @@ vercel
 ```
 
 Set environment variables in Vercel dashboard:
-- `NEXT_PUBLIC_API_URL` - Your Railway backend URL
+- `NEXT_PUBLIC_SITE_URL` - Your deployed app URL
 - `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anon key
 
@@ -120,6 +104,7 @@ Do not treat these values as final statutory advice.
 | [Test Accounts](docs/TEST_ACCOUNTS.md) | Verified demo accounts & test scenarios |
 | [Deployment](docs/DEPLOYMENT.md) | Railway & Vercel deployment guide |
 | [Architecture](docs/ARCHITECTURE.md) | System design & tech stack details |
+| [Backend Architecture](docs/BACKEND_ARCHITECTURE.md) | Active Next backend decision |
 | [Agent Rules](docs/AGENTS.md) | Next.js agent guidelines |
 
 ## Tests

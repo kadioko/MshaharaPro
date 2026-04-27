@@ -2,11 +2,12 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { employees } from "@/lib/demo-data";
 import { money, shortDate } from "@/lib/format";
+import { getEmployees } from "@/lib/supabase/data";
 
 export default async function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const employees = await getEmployees();
   const employee = employees.find((item) => item.id === id);
   if (!employee) notFound();
 

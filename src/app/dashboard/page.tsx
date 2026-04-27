@@ -2,14 +2,16 @@ import Link from "next/link";
 import { AlertTriangle, Building2, Clock, Users, type LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { StatusBadge } from "@/components/app/status-badge";
-import { PayrollSummaryChart } from "@/components/charts/payroll-summary-chart";
+import { PayrollSummaryChartClient } from "@/components/charts/payroll-summary-chart-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { employees, organizations, payrollRuns } from "@/lib/demo-data";
+import { getEmployees, getOrganizations, getPayrollRuns } from "@/lib/supabase/data";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const [employees, organizations, payrollRuns] = await Promise.all([getEmployees(), getOrganizations(), getPayrollRuns()]);
+
   return (
     <AppShell title="Accountant dashboard" description="All client companies, payroll status, missing data, and upcoming compliance work.">
       <div className="grid gap-4 md:grid-cols-4">
@@ -21,7 +23,7 @@ export default function DashboardPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.25fr]">
         <Card>
           <CardHeader><CardTitle>Payroll trend</CardTitle></CardHeader>
-          <CardContent><PayrollSummaryChart /></CardContent>
+          <CardContent><PayrollSummaryChartClient /></CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle>Client payroll monitor</CardTitle></CardHeader>

@@ -115,6 +115,7 @@ create table payroll_adjustments (
 
 create table statutory_rules (
   id uuid primary key default gen_random_uuid(),
+  version integer not null default 1,
   code text not null,
   name text not null,
   formula_type text not null,
@@ -128,6 +129,15 @@ create table statutory_rules (
   effective_to date,
   notes text,
   active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table statutory_rule_versions (
+  id uuid primary key default gen_random_uuid(),
+  statutory_rule_id uuid not null references statutory_rules(id) on delete cascade,
+  changed_by uuid references auth.users(id),
+  before_value jsonb,
+  after_value jsonb not null,
   created_at timestamptz not null default now()
 );
 
@@ -194,6 +204,7 @@ create index on payroll_runs (organization_id, created_at);
 create index on payroll_run_items (organization_id, payroll_run_id, employee_id);
 create index on payroll_adjustments (organization_id, employee_id, payroll_run_id);
 create index on statutory_rules (code, active, effective_from);
+create index on statutory_rule_versions (statutory_rule_id, created_at);
 create index on payslips (organization_id, payroll_run_id, employee_id);
 create index on reports (organization_id, created_at);
 create index on audit_logs (organization_id, created_at);
@@ -228,8 +239,10 @@ returns boolean language sql stable security definer set search_path = public as
 $$;
 
 create policy "Members can read organizations" on organizations for select using (is_org_member(id));
+create policy "Authenticated users can create organizations" on organizations for insert with check (auth.role() = 'authenticated');
 create policy "Owners and accountants can update organizations" on organizations for update using (has_org_role(id, array['platform_admin','accountant','company_owner']::app_role[]));
 create policy "Members can read memberships" on organization_members for select using (is_org_member(organization_id));
+create policy "Users can create their owner membership" on organization_members for insert with check (user_id = auth.uid() and role in ('company_owner', 'accountant'));
 
 create policy "Members can read employees" on employees for select using (is_org_member(organization_id));
 create policy "Payroll staff can manage employees" on employees for all using (has_org_role(organization_id, array['platform_admin','accountant','company_owner','payroll_manager']::app_role[]));
@@ -241,7 +254,7 @@ create policy "Members can read payroll runs" on payroll_runs for select using (
 create policy "Payroll staff can manage payroll runs" on payroll_runs for all using (has_org_role(organization_id, array['platform_admin','accountant','company_owner','payroll_manager']::app_role[]));
 
 create policy "Members can read payroll items" on payroll_run_items for select using (is_org_member(organization_id));
-create policy "Payroll staff can manage payroll items" on payroll_run_items for all using (has_org_role(organization_id, array['platform_admin','accountant','payroll_manager']::app_role[]));
+create policy "Payroll staff can manage payroll items" on payroll_run_items for all using (has_org_role(organization_id, array['platform_admin','accountant','payroll_manager']::app_role[])) with check (has_org_role(organization_id, array['platform_admin','accountant','payroll_manager']::app_role[]));
 
 create policy "Members can read adjustments" on payroll_adjustments for select using (is_org_member(organization_id));
 create policy "Payroll staff can manage adjustments" on payroll_adjustments for all using (has_org_role(organization_id, array['platform_admin','accountant','payroll_manager']::app_role[]));
@@ -259,7 +272,42 @@ create policy "Members can read audit logs" on audit_logs for select using (is_o
 create policy "System can insert audit logs" on audit_logs for insert with check (is_org_member(organization_id));
 
 alter table statutory_rules enable row level security;
+alter table statutory_rule_versions enable row level security;
 create policy "Authenticated users can read active statutory rules" on statutory_rules for select using (auth.role() = 'authenticated');
 create policy "Only platform admins can manage statutory rules" on statutory_rules for all using (
   exists (select 1 from organization_members where user_id = auth.uid() and role = 'platform_admin')
+);
+create policy "Only platform admins can read statutory rule versions" on statutory_rule_versions for select using (
+  exists (select 1 from organization_members where user_id = auth.uid() and role = 'platform_admin')
+);
+create policy "Only platform admins can create statutory rule versions" on statutory_rule_versions for insert with check (
+  exists (select 1 from organization_members where user_id = auth.uid() and role = 'platform_admin')
+);
+
+insert into storage.buckets (id, name, public)
+values
+  ('company-logos', 'company-logos', true),
+  ('employee-documents', 'employee-documents', false),
+  ('payslips', 'payslips', false),
+  ('reports', 'reports', false)
+on conflict (id) do nothing;
+
+create policy "Members can read company logos" on storage.objects for select using (
+  bucket_id = 'company-logos'
+);
+
+create policy "Members can manage organization storage objects" on storage.objects for all using (
+  bucket_id in ('employee-documents', 'payslips', 'reports')
+  and exists (
+    select 1 from organization_members
+    where user_id = auth.uid()
+    and organization_id::text = split_part(name, '/', 1)
+  )
+) with check (
+  bucket_id in ('employee-documents', 'payslips', 'reports')
+  and exists (
+    select 1 from organization_members
+    where user_id = auth.uid()
+    and organization_id::text = split_part(name, '/', 1)
+  )
 );

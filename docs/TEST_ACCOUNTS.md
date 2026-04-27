@@ -53,31 +53,42 @@ Verified test accounts for development and testing.
 
 ## Test User Roles
 
+All demo users use the same test password:
+
+```text
+MshaharaPro2026!
+```
+
 ### Platform Admin
 - **Email**: `admin@mshaharapro.co.tz`
+- **Password**: `MshaharaPro2026!`
 - **Role**: Full system access
 - **Permissions**: Manage all organizations, users, and system settings
 
 ### Accountant
 - **Email**: `accountant@safariledger.co.tz`
+- **Password**: `MshaharaPro2026!`
 - **Organization**: Safari Ledger Co.
 - **Role**: Accountant
 - **Permissions**: Manage payroll, generate reports, view employees
 
 ### Company Owner
 - **Email**: `owner@kilimanjarofoods.co.tz`
+- **Password**: `MshaharaPro2026!`
 - **Organization**: Kilimanjaro Foods Ltd
 - **Role**: Company Owner
 - **Permissions**: Full access to own organization, approve payroll
 
 ### Payroll Manager
 - **Email**: `payroll@safariledger.co.tz`
+- **Password**: `MshaharaPro2026!`
 - **Organization**: Safari Ledger Co.
 - **Role**: Payroll Manager
 - **Permissions**: Run payroll, generate payslips, manage employee data
 
 ### Employee (View Only)
 - **Email**: `asha.mtemvu@example.co.tz`
+- **Password**: `MshaharaPro2026!`
 - **Role**: Employee
 - **Permissions**: View own payslips, update personal info
 

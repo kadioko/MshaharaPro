@@ -36,8 +36,34 @@ export const employeeSchema = z.object({
 
 export const payrollAdjustmentSchema = z.object({
   employeeId: z.string().min(1),
+  payrollRunId: z.string().optional(),
+  organizationId: z.string().min(1),
   type: z.enum(["earning", "deduction"]),
   label: z.string().min(2),
   amount: z.coerce.number().positive(),
   reason: z.string().min(8, "A reason is required for audit history."),
+});
+
+export const authSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
+export const inviteSchema = z.object({
+  token: z.string().min(8),
+});
+
+export const statutoryRuleSchema = z.object({
+  id: z.string().optional(),
+  code: z.string().min(2),
+  name: z.string().min(2),
+  formulaType: z.enum(["percentage", "bracket", "threshold", "fixed"]),
+  rate: z.coerce.number().nonnegative().optional(),
+  employeeShare: z.coerce.number().nonnegative().optional(),
+  employerShare: z.coerce.number().nonnegative().optional(),
+  threshold: z.coerce.number().nonnegative().optional(),
+  cap: z.coerce.number().nonnegative().optional(),
+  effectiveFrom: z.string().min(1),
+  notes: z.string().optional(),
+  active: z.boolean(),
 });

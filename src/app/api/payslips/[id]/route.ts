@@ -1,4 +1,4 @@
-import PDFDocument from "pdfkit";
+import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
 import { employees, organizations } from "@/lib/demo-data";
 import { calculatePayrollRun } from "@/lib/payroll/calculator";
 import { initialStatutoryRules } from "@/lib/payroll/rules";
