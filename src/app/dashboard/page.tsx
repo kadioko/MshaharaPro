@@ -7,13 +7,42 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getCurrentSession } from "@/lib/auth/session";
 import { getEmployees, getOrganizations, getPayrollRuns } from "@/lib/supabase/data";
 
 export default async function DashboardPage() {
-  const [employees, organizations, payrollRuns] = await Promise.all([getEmployees(), getOrganizations(), getPayrollRuns()]);
+  const [session, employees, organizations, payrollRuns] = await Promise.all([
+    getCurrentSession(),
+    getEmployees(),
+    getOrganizations(),
+    getPayrollRuns(),
+  ]);
+
+  if (session?.role === "employee") {
+    const employee = employees[0];
+    return (
+      <AppShell title="Employee portal" description="Your payroll profile, payslips, and documents." requiredPermission="dashboard:read">
+        <div className="grid gap-4 md:grid-cols-3">
+          <Metric title="Visible companies" value={organizations.length} icon={Building2} />
+          <Metric title="Profile records" value={employees.length} icon={Users} />
+          <Metric title="Payroll warnings" value={employee && (!employee.tin || !employee.nssfNumber || !employee.nida) ? 1 : 0} icon={AlertTriangle} />
+        </div>
+        <Card className="mt-6">
+          <CardHeader><CardTitle>Your profile</CardTitle></CardHeader>
+          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium">{employee?.fullName ?? session.name}</p>
+              <p className="text-sm text-muted-foreground">{employee ? `${employee.employeeNumber} · ${employee.jobTitle}` : session.email}</p>
+            </div>
+            {employee ? <Button asChild><Link href={`/employees/${employee.id}`}>Open profile</Link></Button> : null}
+          </CardContent>
+        </Card>
+      </AppShell>
+    );
+  }
 
   return (
-    <AppShell title="Accountant dashboard" description="All client companies, payroll status, missing data, and upcoming compliance work." requiredPermission="company:read">
+    <AppShell title="Accountant dashboard" description="All client companies, payroll status, missing data, and upcoming compliance work." requiredPermission="dashboard:read">
       <div className="grid gap-4 md:grid-cols-4">
         <Metric title="Client companies" value={organizations.length} icon={Building2} />
         <Metric title="Active employees" value={employees.filter((item) => item.active).length} icon={Users} />
@@ -43,7 +72,7 @@ export default async function DashboardPage() {
                       <TableCell><StatusBadge status={run?.status ?? "Draft"} /></TableCell>
                       <TableCell>{org.employeeCount}</TableCell>
                       <TableCell><Progress value={org.sdlApplicable ? 70 : 55} /></TableCell>
-                      <TableCell><Button asChild size="sm" variant="outline"><Link href="/payroll/run-apr-safari">Open payroll</Link></Button></TableCell>
+                      <TableCell><Button asChild size="sm" variant="outline"><Link href={run ? `/payroll/${run.id}` : "/payroll"}>Open payroll</Link></Button></TableCell>
                     </TableRow>
                   );
                 })}

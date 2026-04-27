@@ -9,7 +9,7 @@ import { can } from "@/lib/permissions";
 import { getCurrentSession, hasAppPermission } from "@/lib/auth/session";
 
 const nav = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, permission: "company:read" },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, permission: "dashboard:read" },
   { href: "/companies", label: "Companies", icon: Building2, permission: "company:read" },
   { href: "/employees", label: "Employees", icon: Users, permission: "employee:read" },
   { href: "/payroll", label: "Payroll", icon: ReceiptText, permission: "payroll:read" },

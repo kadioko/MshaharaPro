@@ -11,21 +11,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { adjustments } from "@/lib/demo-data";
 import { calculatePayrollRun } from "@/lib/payroll/calculator";
 import { money, monthLabel } from "@/lib/format";
-import { getEmployees, getOrganizations, getPayrollRuns, getStatutoryRules } from "@/lib/supabase/data";
+import { getEmployees, getOrganizations, getPayrollRunItems, getPayrollRuns, getStatutoryRules } from "@/lib/supabase/data";
 
 export default async function PayrollDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [employees, organizations, payrollRuns, rules] = await Promise.all([
+  const [employees, organizations, payrollRuns, rules, persistedItems] = await Promise.all([
     getEmployees(),
     getOrganizations(),
     getPayrollRuns(),
     getStatutoryRules(),
+    getPayrollRunItems(id),
   ]);
   const run = payrollRuns.find((item) => item.id === id);
   if (!run) notFound();
   const org = organizations.find((item) => item.id === run.organizationId)!;
   const runEmployees = employees.filter((item) => item.organizationId === org.id);
-  const items = calculatePayrollRun(org, runEmployees, adjustments, rules);
+  const items = persistedItems.length ? persistedItems : calculatePayrollRun(org, runEmployees, adjustments, rules);
   const totals = items.reduce((acc, item) => ({ gross: acc.gross + item.grossPay, net: acc.net + item.netPay, employer: acc.employer + item.totalEmployerCost }), { gross: 0, net: 0, employer: 0 });
   const warnings = items.flatMap((item) => item.warnings.map((warning) => `${runEmployees.find((employee) => employee.id === item.employeeId)?.fullName}: ${warning}`));
 

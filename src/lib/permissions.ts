@@ -3,6 +3,7 @@ import type { UserRole } from "@/lib/types";
 const permissions = {
   platform_admin: ["*"],
   accountant: [
+    "dashboard:read",
     "company:read",
     "company:update",
     "employee:read",
@@ -15,6 +16,7 @@ const permissions = {
     "rules:read",
   ],
   company_owner: [
+    "dashboard:read",
     "company:read",
     "company:update",
     "employee:read",
@@ -23,6 +25,7 @@ const permissions = {
     "reports:export",
   ],
   payroll_manager: [
+    "dashboard:read",
     "company:read",
     "employee:read",
     "employee:write",
@@ -31,7 +34,7 @@ const permissions = {
     "payroll:submit",
     "reports:export",
   ],
-  employee: ["employee:self", "payslip:read"],
+  employee: ["dashboard:read", "employee:self", "payslip:read"],
 } satisfies Record<UserRole, string[]>;
 
 export type Permission = (typeof permissions)[UserRole][number];

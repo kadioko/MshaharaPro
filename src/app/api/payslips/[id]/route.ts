@@ -1,22 +1,33 @@
 import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
 import { writeAuditLog } from "@/lib/supabase/audit";
 import { getCurrentSession } from "@/lib/auth/session";
-import { employees, organizations } from "@/lib/demo-data";
 import { calculatePayrollRun } from "@/lib/payroll/calculator";
-import { initialStatutoryRules } from "@/lib/payroll/rules";
 import { money } from "@/lib/format";
+import { getEmployees, getOrganizations, getPayrollRunItems, getPayrollRuns, getStatutoryRules } from "@/lib/supabase/data";
 import { tryCreateSupabaseServerClient } from "@/lib/supabase/server";
 import { uploadStorageFile } from "@/lib/supabase/storage";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const runId = new URL(request.url).searchParams.get("run");
   const session = await getCurrentSession();
-  const employee = employees.find((item) => item.id === id) ?? employees[0];
+  const [employees, organizations, payrollRuns, rules, persistedItems] = await Promise.all([
+    getEmployees(),
+    getOrganizations(),
+    getPayrollRuns(),
+    getStatutoryRules(),
+    runId ? getPayrollRunItems(runId) : Promise.resolve([]),
+  ]);
+  const employee = employees.find((item) => item.id === id);
+  if (!employee) return Response.json({ error: "Payslip employee not found." }, { status: 404 });
   if (session?.role === "employee" && employee.email !== session.email) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
-  const organization = organizations.find((item) => item.id === employee.organizationId)!;
-  const [item] = calculatePayrollRun(organization, [employee], [], initialStatutoryRules);
+  const organization = organizations.find((item) => item.id === employee.organizationId);
+  if (!organization) return Response.json({ error: "Payslip organization not found." }, { status: 404 });
+  const run = payrollRuns.find((item) => item.id === runId);
+  const item = persistedItems.find((lineItem) => lineItem.employeeId === employee.id) ?? calculatePayrollRun(organization, [employee], [], rules)[0];
+  const payrollMonth = run?.month ?? "2026-04";
   const chunks: Buffer[] = [];
   const doc = new PDFDocument({ size: "A4", margin: 48 });
 
@@ -29,7 +40,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   doc.text(`Employee: ${employee.fullName} (${employee.employeeNumber})`);
   doc.text(`Job title: ${employee.jobTitle}`);
   doc.text(`Department: ${employee.department}`);
-  doc.text("Payroll month: April 2026");
+  doc.text(`Payroll month: ${payrollMonth}`);
   doc.moveDown();
   doc.fontSize(14).text("Earnings");
   doc.fontSize(11).text(`Basic salary: ${money(item.basicSalary)}`);
@@ -52,18 +63,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   doc.end();
 
   const pdf = await done;
-  const storagePath = `${organization.id}/${employee.id}/april-2026-payslip.pdf`;
+  const storagePath = `${organization.id}/${employee.id}/${payrollMonth}-payslip.pdf`;
   const upload = await uploadStorageFile("payslips", storagePath, new Blob([new Uint8Array(pdf)], { type: "application/pdf" }), "application/pdf");
   const supabase = await tryCreateSupabaseServerClient();
-  const runId = new URL(_request.url).searchParams.get("run");
   const isUuidRun = Boolean(runId?.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i));
   if (supabase && upload.ok && isUuidRun) {
-    await supabase.from("payslips").insert({
+    await supabase.from("payslips").upsert({
       organization_id: organization.id,
       payroll_run_id: runId,
       employee_id: employee.id,
       storage_path: storagePath,
-    });
+    }, { onConflict: "organization_id,payroll_run_id,employee_id" });
     await writeAuditLog({
       organizationId: organization.id,
       action: "Payslip generated",
@@ -76,7 +86,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${employee.employeeNumber}-april-2026-payslip.pdf"`,
+      "Content-Disposition": `attachment; filename="${employee.employeeNumber}-${payrollMonth}-payslip.pdf"`,
     },
   });
 }

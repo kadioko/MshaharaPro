@@ -10,7 +10,9 @@
     "test": "vitest run",
     "verify": "npm run lint && npm test && npm run build",
     "supabase:apply": "node scripts/run-supabase-cli.mjs db push",
-    "supabase:seed-users": "tsx scripts/seed-supabase-users.ts"
+    "supabase:seed-users": "tsx scripts/seed-supabase-users.ts",
+    "supabase:seed-data": "tsx scripts/seed-supabase-data.ts",
+    "supabase:verify-rls": "tsx scripts/verify-supabase-rls.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

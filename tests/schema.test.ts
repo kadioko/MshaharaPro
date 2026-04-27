@@ -18,6 +18,15 @@ describe("supabase schema", () => {
     expect(schema).toContain("reports");
   });
 
+  it("limits employee-role users to their own portal records", () => {
+    expect(schema).toContain("is_employee_record_owner");
+    expect(schema).toContain("Employees can read own employee profile");
+    expect(schema).toContain("Employees can read own payroll items");
+    expect(schema).toContain("Employees can read own payslips");
+    expect(schema).toContain("Employees can read own protected files");
+    expect(schema).not.toContain('create policy "Members can read employees"');
+  });
+
   it("tracks statutory rule versions", () => {
     expect(schema).toContain("create table statutory_rule_versions");
     expect(schema).toContain("Only platform admins can create statutory rule versions");

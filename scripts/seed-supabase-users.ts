@@ -1,18 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { demoAccounts, DEMO_PASSWORD } from "../src/lib/demo-accounts";
-
-function loadLocalEnv() {
-  if (!existsSync(".env.local")) return;
-
-  for (const line of readFileSync(".env.local", "utf8").split(/\r?\n/)) {
-    const match = line.match(/^([^#=]+)=(.*)$/);
-    if (!match) continue;
-
-    const [, key, value] = match;
-    process.env[key.trim()] ??= value.trim();
-  }
-}
+import { loadLocalEnv } from "./env";
 
 async function main() {
   loadLocalEnv();

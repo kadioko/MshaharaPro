@@ -1,7 +1,7 @@
 import { auditLogs, employees, organizations, payrollRuns } from "@/lib/demo-data";
 import { getCurrentSession } from "@/lib/auth/session";
 import { initialStatutoryRules } from "@/lib/payroll/rules";
-import type { StatutoryRule } from "@/lib/types";
+import type { PayrollLineItem, StatutoryRule } from "@/lib/types";
 import { tryCreateSupabaseServerClient } from "./server";
 
 export async function getOrganizations() {
@@ -90,6 +90,35 @@ export async function getPayrollRuns() {
     approvedAt: row.approved_at ?? undefined,
     paidAt: row.paid_at ?? undefined,
     lockedAt: row.locked_at ?? undefined,
+  }));
+}
+
+export async function getPayrollRunItems(payrollRunId: string): Promise<PayrollLineItem[]> {
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("payroll_run_items")
+    .select("*")
+    .eq("payroll_run_id", payrollRunId)
+    .order("created_at");
+  if (error || !data) return [];
+  return data.map((row) => ({
+    employeeId: row.employee_id,
+    basicSalary: Number(row.basic_salary),
+    allowances: Number(row.allowances),
+    overtime: Number(row.overtime),
+    bonuses: Number(row.bonuses),
+    grossPay: Number(row.gross_pay),
+    nssfEmployee: Number(row.nssf_employee),
+    paye: Number(row.paye),
+    otherDeductions: Number(row.other_deductions),
+    loanRepayment: Number(row.loan_repayment),
+    netPay: Number(row.net_pay),
+    employerNssf: Number(row.employer_nssf),
+    wcf: Number(row.wcf),
+    sdlAllocation: Number(row.sdl_allocation),
+    totalEmployerCost: Number(row.total_employer_cost),
+    warnings: Array.isArray(row.warnings) ? row.warnings : [],
   }));
 }
 

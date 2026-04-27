@@ -41,7 +41,9 @@ vercel
 Set environment variables in Vercel dashboard:
 - `NEXT_PUBLIC_SITE_URL` - Your deployed app URL
 - `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` - Your Supabase publishable key
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anon key
+- `SUPABASE_SERVICE_ROLE_KEY` - Server-only key for storage/report/payslip writes
 
 ## Environment variables
 
@@ -49,24 +51,31 @@ Create `.env.local` when connecting a real Supabase project:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-The current MVP screens use typed seed data in `src/lib/demo-data.ts`, so the UI runs without a live Supabase project.
+The app falls back to typed demo data in `src/lib/demo-data.ts` when Supabase is not configured. With Supabase configured, app data is read from the live project under RLS.
 
 ## Supabase database
 
 Apply:
 
 ```bash
-supabase db push
-supabase db reset
+node scripts/run-supabase-cli.mjs link --project-ref your-project-ref
+node scripts/run-supabase-cli.mjs db query --linked --file supabase/schema.sql
+node scripts/run-supabase-cli.mjs db query --linked --file supabase/rls_employee_portal.sql
+npm run supabase:seed-data
+npm run supabase:verify-rls
 ```
 
 Important files:
 
 - `supabase/schema.sql`: multi-tenant PostgreSQL schema, indexes, and RLS policies
 - `supabase/seed.sql`: initial statutory rules and two sample organizations
+- `scripts/seed-supabase-data.ts`: repeatable live Supabase seed for organizations, memberships, employees, payroll data, rules, and audit logs
+- `scripts/verify-supabase-rls.ts`: role-by-role RLS verification against real Supabase Auth sessions
 
 Core tables:
 
@@ -84,7 +93,7 @@ Core tables:
 - `documents`
 - `audit_logs`
 
-RLS is organized around `organization_members`, with helper functions `is_org_member` and `has_org_role`. Application code must still re-check role permissions in server actions or route handlers before writes.
+RLS is organized around `organization_members`, with helper functions `is_org_member`, `has_org_role`, and employee self-access helpers. Application code still re-checks role permissions in server actions and route handlers before writes.
 
 ## Payroll rules
 
@@ -106,6 +115,9 @@ Do not treat these values as final statutory advice.
 | [Architecture](docs/ARCHITECTURE.md) | System design & tech stack details |
 | [Backend Architecture](docs/BACKEND_ARCHITECTURE.md) | Active Next backend decision |
 | [Supabase Setup](docs/SUPABASE_SETUP.md) | Migration, env vars, and demo user seeding |
+| [Investor Brief](docs/INVESTOR_BRIEF.md) | Business opportunity, investor value, risks, and funding use |
+| [User Guide](docs/USER_GUIDE.md) | User types, workflows, and best practices |
+| [Business Strategy](docs/BUSINESS_STRATEGY.md) | Positioning, pricing direction, go-to-market, and launch checklist |
 | [Agent Rules](docs/AGENTS.md) | Next.js agent guidelines |
 
 ## Tests
@@ -124,8 +136,9 @@ Coverage includes:
 
 ## Known limitations
 
-- The UI is a polished MVP/demo and not yet wired end-to-end to Supabase mutations.
+- Some full CRUD surfaces still need deeper edit/delete UX polish.
 - PAYE brackets are placeholders and must be reviewed and updated by a qualified Tanzanian accountant or tax advisor.
 - Statutory payroll rules must be reviewed, configured, and maintained by a qualified local expert before any submission.
-- Approval workflows, invites, storage uploads, and audit capture are represented in schema/UI but need production server actions for live use.
+- Final statutory report templates should be reviewed against current TRA/NSSF/WCF/SDL filing formats before production submission.
+- Production monitoring should be connected before launch.
 - Payroll calculations should be reviewed by a qualified accountant or tax advisor before submission.

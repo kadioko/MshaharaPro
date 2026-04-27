@@ -5,16 +5,18 @@ import { AppShell } from "@/components/app/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { money, shortDate } from "@/lib/format";
+import { getCurrentSession } from "@/lib/auth/session";
 import { getEmployees } from "@/lib/supabase/data";
 
 export default async function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const employees = await getEmployees();
+  const [session, employees] = await Promise.all([getCurrentSession(), getEmployees()]);
   const employee = employees.find((item) => item.id === id);
   if (!employee) notFound();
+  const requiredPermission = session?.role === "employee" && employee.email === session.email ? "employee:self" : "employee:read";
 
   return (
-    <AppShell title={employee.fullName} description={`${employee.jobTitle} · ${employee.department}`} requiredPermission="employee:read">
+    <AppShell title={employee.fullName} description={`${employee.jobTitle} · ${employee.department}`} requiredPermission={requiredPermission}>
       <Tabs defaultValue="personal">
         <TabsList className="flex h-auto flex-wrap justify-start">
           {["personal", "compensation", "deductions", "loans", "payslips", "documents", "audit"].map((tab) => <TabsTrigger key={tab} value={tab}>{tab}</TabsTrigger>)}
