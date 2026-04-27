@@ -1,12 +1,20 @@
 import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
+import { writeAuditLog } from "@/lib/supabase/audit";
+import { getCurrentSession } from "@/lib/auth/session";
 import { employees, organizations } from "@/lib/demo-data";
 import { calculatePayrollRun } from "@/lib/payroll/calculator";
 import { initialStatutoryRules } from "@/lib/payroll/rules";
 import { money } from "@/lib/format";
+import { tryCreateSupabaseServerClient } from "@/lib/supabase/server";
+import { uploadStorageFile } from "@/lib/supabase/storage";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const session = await getCurrentSession();
   const employee = employees.find((item) => item.id === id) ?? employees[0];
+  if (session?.role === "employee" && employee.email !== session.email) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
   const organization = organizations.find((item) => item.id === employee.organizationId)!;
   const [item] = calculatePayrollRun(organization, [employee], [], initialStatutoryRules);
   const chunks: Buffer[] = [];
@@ -44,6 +52,27 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   doc.end();
 
   const pdf = await done;
+  const storagePath = `${organization.id}/${employee.id}/april-2026-payslip.pdf`;
+  const upload = await uploadStorageFile("payslips", storagePath, new Blob([new Uint8Array(pdf)], { type: "application/pdf" }), "application/pdf");
+  const supabase = await tryCreateSupabaseServerClient();
+  const runId = new URL(_request.url).searchParams.get("run");
+  const isUuidRun = Boolean(runId?.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i));
+  if (supabase && upload.ok && isUuidRun) {
+    await supabase.from("payslips").insert({
+      organization_id: organization.id,
+      payroll_run_id: runId,
+      employee_id: employee.id,
+      storage_path: storagePath,
+    });
+    await writeAuditLog({
+      organizationId: organization.id,
+      action: "Payslip generated",
+      entityType: "payslip",
+      entityId: employee.id,
+      afterValue: { storagePath },
+    });
+  }
+
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",

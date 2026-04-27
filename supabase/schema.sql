@@ -296,6 +296,24 @@ create policy "Members can read company logos" on storage.objects for select usi
   bucket_id = 'company-logos'
 );
 
+create policy "Members can manage company logos" on storage.objects for all using (
+  bucket_id = 'company-logos'
+  and exists (
+    select 1 from organization_members
+    where user_id = auth.uid()
+    and organization_id::text = split_part(name, '/', 1)
+    and role in ('platform_admin', 'accountant', 'company_owner')
+  )
+) with check (
+  bucket_id = 'company-logos'
+  and exists (
+    select 1 from organization_members
+    where user_id = auth.uid()
+    and organization_id::text = split_part(name, '/', 1)
+    and role in ('platform_admin', 'accountant', 'company_owner')
+  )
+);
+
 create policy "Members can manage organization storage objects" on storage.objects for all using (
   bucket_id in ('employee-documents', 'payslips', 'reports')
   and exists (

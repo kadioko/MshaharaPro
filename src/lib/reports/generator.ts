@@ -87,23 +87,65 @@ function buildRows(type: ReportType, organization: Organization, employees: Empl
   }
 
   if (type === "paye") {
-    return [["Employee No", "Name", "Gross Pay", "PAYE"], ...base.map(({ item, employee }) => [employee?.employeeNumber ?? "", employee?.fullName ?? "", item.grossPay, item.paye])];
+    return [
+      ["Employer TIN", "Employee TIN", "Employee No", "Employee Name", "Taxable Pay", "PAYE Withheld", "Payroll Month"],
+      ...base.map(({ item, employee }) => [
+        organization.tin,
+        employee?.tin ?? "MISSING",
+        employee?.employeeNumber ?? "",
+        employee?.fullName ?? "",
+        item.grossPay - item.nssfEmployee,
+        item.paye,
+        "April 2026",
+      ]),
+    ];
   }
 
   if (type === "nssf") {
-    return [["Employee No", "Name", "NSSF No", "Employee NSSF", "Employer NSSF"], ...base.map(({ item, employee }) => [employee?.employeeNumber ?? "", employee?.fullName ?? "", employee?.nssfNumber ?? "", item.nssfEmployee, item.employerNssf])];
+    return [
+      ["Employer NSSF No", "Employee NSSF No", "Employee No", "Employee Name", "Gross Pay", "Employee Share", "Employer Share", "Total Contribution"],
+      ...base.map(({ item, employee }) => [
+        organization.nssfEmployerNumber,
+        employee?.nssfNumber ?? "MISSING",
+        employee?.employeeNumber ?? "",
+        employee?.fullName ?? "",
+        item.grossPay,
+        item.nssfEmployee,
+        item.employerNssf,
+        item.nssfEmployee + item.employerNssf,
+      ]),
+    ];
   }
 
   if (type === "wcf") {
-    return [["Employee No", "Name", "Gross Pay", "WCF"], ...base.map(({ item, employee }) => [employee?.employeeNumber ?? "", employee?.fullName ?? "", item.grossPay, item.wcf])];
+    return [
+      ["WCF Registration No", "Employee No", "Employee Name", "Gross Earnings", "WCF Contribution"],
+      ...base.map(({ item, employee }) => [
+        organization.wcfRegistrationNumber,
+        employee?.employeeNumber ?? "",
+        employee?.fullName ?? "",
+        item.grossPay,
+        item.wcf,
+      ]),
+    ];
   }
 
   if (type === "sdl") {
-    return [["Company", "SDL applicable", "SDL allocation total"], [organization.name, organization.sdlApplicable ? "Yes" : "No", items.reduce((sum, item) => sum + item.sdlAllocation, 0)]];
+    return [
+      ["Employer TIN", "Company", "Employee Count", "SDL Applicable", "Total Monthly Emoluments", "SDL Amount"],
+      [
+        organization.tin,
+        organization.name,
+        organization.employeeCount,
+        organization.sdlApplicable ? "Yes" : "No",
+        items.reduce((sum, item) => sum + item.grossPay, 0),
+        items.reduce((sum, item) => sum + item.sdlAllocation, 0),
+      ],
+    ];
   }
 
   if (type === "bank-schedule") {
-    return [["Employee No", "Name", "Bank", "Account", "Net Pay"], ...base.map(({ item, employee }) => [employee?.employeeNumber ?? "", employee?.fullName ?? "", employee?.bankName ?? "", employee?.bankAccountNumber ?? "", item.netPay])];
+    return [["Employee No", "Name", "Bank", "Account", "Mobile Money", "Net Pay", "Payment Reference"], ...base.map(({ item, employee }) => [employee?.employeeNumber ?? "", employee?.fullName ?? "", employee?.bankName ?? "", employee?.bankAccountNumber ?? "", employee?.mobileMoneyNumber ?? "", item.netPay, `PAY-2026-04-${employee?.employeeNumber ?? ""}`])];
   }
 
   if (type === "department-cost") {

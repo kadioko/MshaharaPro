@@ -18,7 +18,8 @@ describe("report exports", () => {
   });
 
   it("includes statutory amounts in PAYE/NSSF reports", () => {
-    expect(generateReportCsv("paye", organization, orgEmployees, items)).toContain("PAYE");
-    expect(generateReportCsv("nssf", organization, orgEmployees, items)).toContain("Employer NSSF");
+    expect(generateReportCsv("paye", organization, orgEmployees, items)).toContain("PAYE Withheld");
+    expect(generateReportCsv("nssf", organization, orgEmployees, items)).toContain("Total Contribution");
+    expect(generateReportCsv("sdl", organization, orgEmployees, items)).toContain("Total Monthly Emoluments");
   });
 });

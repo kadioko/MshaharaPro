@@ -105,6 +105,7 @@ Do not treat these values as final statutory advice.
 | [Deployment](docs/DEPLOYMENT.md) | Railway & Vercel deployment guide |
 | [Architecture](docs/ARCHITECTURE.md) | System design & tech stack details |
 | [Backend Architecture](docs/BACKEND_ARCHITECTURE.md) | Active Next backend decision |
+| [Supabase Setup](docs/SUPABASE_SETUP.md) | Migration, env vars, and demo user seeding |
 | [Agent Rules](docs/AGENTS.md) | Next.js agent guidelines |
 
 ## Tests

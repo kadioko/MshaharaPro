@@ -1,11 +1,16 @@
 import { auditLogs, employees, organizations, payrollRuns } from "@/lib/demo-data";
+import { getCurrentSession } from "@/lib/auth/session";
 import { initialStatutoryRules } from "@/lib/payroll/rules";
 import type { StatutoryRule } from "@/lib/types";
 import { tryCreateSupabaseServerClient } from "./server";
 
 export async function getOrganizations() {
+  const session = await getCurrentSession();
   const supabase = await tryCreateSupabaseServerClient();
-  if (!supabase) return organizations;
+  if (!supabase) {
+    if (session?.role === "employee") return organizations.filter((org) => org.name === session.organization);
+    return organizations;
+  }
   const { data, error } = await supabase.from("organizations").select("*").order("created_at");
   if (error || !data) return organizations;
   return data.map((row) => ({
@@ -27,14 +32,18 @@ export async function getOrganizations() {
 }
 
 export async function getEmployees() {
+  const session = await getCurrentSession();
   const supabase = await tryCreateSupabaseServerClient();
-  if (!supabase) return employees;
+  if (!supabase) {
+    if (session?.role === "employee") return employees.filter((employee) => employee.email === session.email);
+    return employees;
+  }
   const { data, error } = await supabase
     .from("employees")
     .select("*, employee_compensation(basic_salary, allowances)")
     .order("created_at");
   if (error || !data) return employees;
-  return data.map((row) => {
+  const mapped = data.map((row) => {
     const compensation = Array.isArray(row.employee_compensation) ? row.employee_compensation[0] : null;
     return {
       id: row.id,
@@ -58,11 +67,18 @@ export async function getEmployees() {
       active: row.active,
     };
   });
+  if (session?.role === "employee") return mapped.filter((employee) => employee.email === session.email);
+  return mapped;
 }
 
 export async function getPayrollRuns() {
+  const session = await getCurrentSession();
   const supabase = await tryCreateSupabaseServerClient();
-  if (!supabase) return payrollRuns;
+  if (!supabase) {
+    if (session?.role === "employee") return [];
+    return payrollRuns;
+  }
+  if (session?.role === "employee") return [];
   const { data, error } = await supabase.from("payroll_runs").select("*").order("payroll_month", { ascending: false });
   if (error || !data) return payrollRuns;
   return data.map((row) => ({

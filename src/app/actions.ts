@@ -268,6 +268,110 @@ export async function createEmployeeAction(_prevState: ActionState, formData: Fo
   return { ok: true, message: "Employee saved." };
 }
 
+export async function updateEmployeeAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const employeeId = String(formData.get("employeeId") ?? "");
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const parsed = employeeSchema.safeParse({
+    employeeNumber: formData.get("employeeNumber"),
+    fullName: formData.get("fullName"),
+    email: formData.get("email"),
+    phone: formData.get("phone"),
+    nida: formData.get("nida") || undefined,
+    tin: formData.get("tin") || undefined,
+    nssfNumber: formData.get("nssfNumber") || undefined,
+    jobTitle: formData.get("jobTitle"),
+    department: formData.get("department"),
+    employmentType: formData.get("employmentType") || "permanent",
+    startDate: formData.get("startDate"),
+    basicSalary: formData.get("basicSalary"),
+    allowances: formData.get("allowances") || 0,
+    bankName: formData.get("bankName") || undefined,
+    bankAccountNumber: formData.get("bankAccountNumber") || undefined,
+    mobileMoneyNumber: formData.get("mobileMoneyNumber") || undefined,
+    active: formData.get("active") !== "off",
+  });
+  if (!employeeId || !organizationId) return { ok: false, message: "Missing employee." };
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid employee." };
+  const denied = await forbidden("employee:write", organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: "Demo employee updated for preview." };
+
+  const rows = employeeToRows({ ...parsed.data, id: employeeId, organizationId });
+  const { data: beforeValue } = await supabase.from("employees").select("*").eq("id", employeeId).single();
+  const { error } = await supabase.from("employees").update(rows.employee).eq("id", employeeId);
+  if (error) return { ok: false, message: error.message };
+  await supabase.from("employee_compensation").insert({ ...rows.compensation, employee_id: employeeId });
+  await writeAuditLog({
+    organizationId,
+    action: "Employee updated",
+    entityType: "employee",
+    entityId: employeeId,
+    beforeValue: beforeValue ?? null,
+    afterValue: parsed.data,
+  });
+  revalidatePath(`/employees/${employeeId}`);
+  revalidatePath("/employees");
+  return { ok: true, message: "Employee updated." };
+}
+
+export async function deactivateEmployeeAction(employeeId: string, organizationId: string): Promise<ActionState> {
+  const denied = await forbidden("employee:write", organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: "Demo employee deactivated for preview." };
+  const { data: beforeValue } = await supabase.from("employees").select("*").eq("id", employeeId).single();
+  const { error } = await supabase.from("employees").update({ active: false }).eq("id", employeeId);
+  if (error) return { ok: false, message: error.message };
+  await writeAuditLog({
+    organizationId,
+    action: "Employee deactivated",
+    entityType: "employee",
+    entityId: employeeId,
+    beforeValue: beforeValue ?? null,
+    afterValue: { active: false },
+  });
+  revalidatePath("/employees");
+  return { ok: true, message: "Employee deactivated." };
+}
+
+export async function deleteInviteAction(inviteId: string, organizationId: string): Promise<ActionState> {
+  const denied = await forbidden("company:update", organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: "Demo invite revoked for preview." };
+  const { data: beforeValue } = await supabase.from("invites").select("*").eq("id", inviteId).single();
+  const { error } = await supabase.from("invites").delete().eq("id", inviteId);
+  if (error) return { ok: false, message: error.message };
+  await writeAuditLog({
+    organizationId,
+    action: "Invite revoked",
+    entityType: "invite",
+    entityId: inviteId,
+    beforeValue: beforeValue ?? null,
+  });
+  return { ok: true, message: "Invite revoked." };
+}
+
+export async function deleteDocumentAction(documentId: string, organizationId: string): Promise<ActionState> {
+  const denied = await forbidden("employee:write", organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: "Demo document deleted for preview." };
+  const { data: beforeValue } = await supabase.from("documents").select("*").eq("id", documentId).single();
+  const { error } = await supabase.from("documents").delete().eq("id", documentId);
+  if (error) return { ok: false, message: error.message };
+  if (beforeValue?.storage_path) await supabase.storage.from("employee-documents").remove([beforeValue.storage_path]);
+  await writeAuditLog({
+    organizationId,
+    action: "Employee document deleted",
+    entityType: "document",
+    entityId: documentId,
+    beforeValue: beforeValue ?? null,
+  });
+  return { ok: true, message: "Document deleted." };
+}
+
 export async function createInviteAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = createInviteSchema.safeParse({
     organizationId: formData.get("organizationId"),

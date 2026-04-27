@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify": "npm run lint && npm test && npm run build",
+    "supabase:apply": "supabase db push",
+    "supabase:seed-users": "tsx scripts/seed-supabase-users.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -40,6 +43,7 @@
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "tsx": "^4.21.0",
     "vitest": "^4.1.5"
   }
 }

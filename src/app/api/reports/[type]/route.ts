@@ -1,8 +1,11 @@
 import { NextRequest } from "next/server";
+import { writeAuditLog } from "@/lib/supabase/audit";
 import { employees, organizations } from "@/lib/demo-data";
 import { calculatePayrollRun } from "@/lib/payroll/calculator";
 import { initialStatutoryRules } from "@/lib/payroll/rules";
 import { generateReportCsv, generateReportPdf, reportLabels, reportTypes, type ReportType } from "@/lib/reports/generator";
+import { tryCreateSupabaseServerClient } from "@/lib/supabase/server";
+import { uploadStorageFile } from "@/lib/supabase/storage";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ type: string }> }) {
   const { type } = await params;
@@ -19,6 +22,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   if (format === "pdf") {
     const pdf = await generateReportPdf(reportType, organization, orgEmployees, items);
+    const storagePath = `${organization.id}/${filename}.pdf`;
+    const upload = await uploadStorageFile("reports", storagePath, new Blob([new Uint8Array(pdf)], { type: "application/pdf" }), "application/pdf");
+    const supabase = await tryCreateSupabaseServerClient();
+    if (supabase && upload.ok) {
+      const { data: report } = await supabase
+        .from("reports")
+        .insert({ organization_id: organization.id, report_type: reportType, format: "pdf", storage_path: storagePath })
+        .select("id")
+        .single();
+      await writeAuditLog({
+        organizationId: organization.id,
+        action: "Report exported",
+        entityType: "report",
+        entityId: report?.id,
+        afterValue: { reportType, format: "pdf", storagePath },
+      });
+    }
     return new Response(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
@@ -28,6 +48,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   const csv = generateReportCsv(reportType, organization, orgEmployees, items);
+  const storagePath = `${organization.id}/${filename}.csv`;
+  const upload = await uploadStorageFile("reports", storagePath, new Blob([csv], { type: "text/csv" }), "text/csv");
+  const supabase = await tryCreateSupabaseServerClient();
+  if (supabase && upload.ok) {
+    const { data: report } = await supabase
+      .from("reports")
+      .insert({ organization_id: organization.id, report_type: reportType, format: "csv", storage_path: storagePath })
+      .select("id")
+      .single();
+    await writeAuditLog({
+      organizationId: organization.id,
+      action: "Report exported",
+      entityType: "report",
+      entityId: report?.id,
+      afterValue: { reportType, format: "csv", storagePath },
+    });
+  }
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
