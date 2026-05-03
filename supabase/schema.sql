@@ -182,6 +182,20 @@ create table documents (
   created_at timestamptz not null default now()
 );
 
+create table organization_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id) on delete cascade,
+  plan_code text not null check (plan_code in ('starter', 'growth', 'accountant', 'advisory')),
+  status text not null default 'trialing' check (status in ('trialing', 'active', 'past_due', 'cancelled')),
+  seats integer not null default 1 check (seats > 0),
+  billing_email text not null,
+  trial_ends_at timestamptz,
+  current_period_ends_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (organization_id)
+);
+
 create table audit_logs (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id) on delete cascade,
@@ -208,6 +222,7 @@ create index on statutory_rules (code, active, effective_from);
 create index on statutory_rule_versions (statutory_rule_id, created_at);
 create index on payslips (organization_id, payroll_run_id, employee_id);
 create index on reports (organization_id, created_at);
+create index on organization_subscriptions (organization_id, status);
 create index on audit_logs (organization_id, created_at);
 
 alter table organizations enable row level security;
@@ -221,6 +236,7 @@ alter table payslips enable row level security;
 alter table reports enable row level security;
 alter table invites enable row level security;
 alter table documents enable row level security;
+alter table organization_subscriptions enable row level security;
 alter table audit_logs enable row level security;
 
 create or replace function is_org_member(org_id uuid)
@@ -319,6 +335,15 @@ create policy "Payroll staff can read documents" on documents for select using (
 );
 create policy "Employees can read own documents" on documents for select using (employee_id is not null and is_employee_record_owner(employee_id));
 create policy "Payroll staff can manage documents" on documents for all using (has_org_role(organization_id, array['platform_admin','accountant','payroll_manager']::app_role[]));
+
+create policy "Owners and accountants can read subscriptions" on organization_subscriptions for select using (
+  has_org_role(organization_id, array['platform_admin','accountant','company_owner']::app_role[])
+);
+create policy "Owners and accountants can manage subscriptions" on organization_subscriptions for all using (
+  has_org_role(organization_id, array['platform_admin','accountant','company_owner']::app_role[])
+) with check (
+  has_org_role(organization_id, array['platform_admin','accountant','company_owner']::app_role[])
+);
 
 create policy "Staff can read audit logs" on audit_logs for select using (
   has_org_role(organization_id, array['platform_admin','accountant','company_owner','payroll_manager']::app_role[])

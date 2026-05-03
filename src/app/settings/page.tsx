@@ -42,6 +42,7 @@ export default async function SettingsPage() {
           <CardHeader><CardTitle>Administration</CardTitle><CardDescription>Rules, audit logs, and role-sensitive areas.</CardDescription></CardHeader>
           <CardContent className="space-y-3">
             <Button asChild variant="outline" className="w-full justify-start"><Link href="/settings/payroll-rules">Payroll rules admin</Link></Button>
+            <Button asChild variant="outline" className="w-full justify-start"><Link href="/settings/billing">Billing and plans</Link></Button>
             <Button asChild variant="outline" className="w-full justify-start"><Link href="/audit-logs">Audit logs</Link></Button>
             <p className="text-xs text-muted-foreground">Payroll calculations should be reviewed by a qualified accountant or tax advisor before submission.</p>
           </CardContent>

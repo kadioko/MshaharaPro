@@ -2,6 +2,7 @@ import { auditLogs, employees, organizations, payrollRuns } from "@/lib/demo-dat
 import { getCurrentSession } from "@/lib/auth/session";
 import { initialStatutoryRules } from "@/lib/payroll/rules";
 import type { PayrollLineItem, StatutoryRule } from "@/lib/types";
+import { getBillingPlan } from "@/lib/billing/plans";
 import { tryCreateSupabaseServerClient } from "./server";
 
 export async function getOrganizations() {
@@ -240,4 +241,53 @@ export async function getAuditLogs() {
     ipAddress: row.ip_address ?? undefined,
     userAgent: row.user_agent ?? undefined,
   }));
+}
+
+export async function getOrganizationSubscription(organizationId: string) {
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) {
+    return {
+      id: "demo-subscription",
+      organizationId,
+      planCode: "starter",
+      plan: getBillingPlan("starter"),
+      status: "trialing",
+      seats: 1,
+      billingEmail: "billing@example.co.tz",
+      trialEndsAt: undefined,
+      currentPeriodEndsAt: undefined,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("organization_subscriptions")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return {
+      id: "",
+      organizationId,
+      planCode: "starter",
+      plan: getBillingPlan("starter"),
+      status: "not_configured",
+      seats: 1,
+      billingEmail: "",
+      trialEndsAt: undefined,
+      currentPeriodEndsAt: undefined,
+    };
+  }
+
+  return {
+    id: data.id,
+    organizationId: data.organization_id,
+    planCode: data.plan_code,
+    plan: getBillingPlan(data.plan_code),
+    status: data.status,
+    seats: Number(data.seats),
+    billingEmail: data.billing_email,
+    trialEndsAt: data.trial_ends_at ?? undefined,
+    currentPeriodEndsAt: data.current_period_ends_at ?? undefined,
+  };
 }

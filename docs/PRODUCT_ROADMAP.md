@@ -87,5 +87,6 @@ Recommended next build order:
 3. Document download UX
 4. Invite resend/copy-link UX
 5. Final statutory report review and template locking
-6. Billing/subscriptions
+6. Stripe checkout and subscription webhooks
 7. Production monitoring dashboards
+8. Customer onboarding checklist and sample import templates

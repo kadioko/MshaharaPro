@@ -118,6 +118,7 @@ Do not treat these values as final statutory advice.
 | [Investor Brief](docs/INVESTOR_BRIEF.md) | Business opportunity, investor value, risks, and funding use |
 | [User Guide](docs/USER_GUIDE.md) | User types, workflows, and best practices |
 | [Business Strategy](docs/BUSINESS_STRATEGY.md) | Positioning, pricing direction, go-to-market, and launch checklist |
+| [Billing Strategy](docs/BILLING_STRATEGY.md) | SaaS plans, billing implementation status, and Stripe next steps |
 | [Statutory Report Templates](docs/STATUTORY_REPORT_TEMPLATES.md) | Template fields and accountant-review checklist for statutory reports |
 | [Accountant Review Packet](docs/ACCOUNTANT_REVIEW_PACKET.md) | Sign-off worksheet for PAYE/NSSF/WCF/SDL review |
 | [Security Operations](docs/SECURITY_OPERATIONS.md) | Token cleanup, Vercel envs, monitoring, and release checks |

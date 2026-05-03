@@ -78,3 +78,10 @@ export const statutoryRuleSchema = z.object({
   notes: z.string().optional(),
   active: z.boolean(),
 });
+
+export const subscriptionSchema = z.object({
+  organizationId: z.string().min(1),
+  planCode: z.enum(["starter", "growth", "accountant", "advisory"]),
+  billingEmail: z.string().email(),
+  seats: z.coerce.number().int().positive(),
+});

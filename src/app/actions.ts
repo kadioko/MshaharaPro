@@ -7,8 +7,7 @@ import { writeAuditLog } from "@/lib/supabase/audit";
 import { requireAppPermission } from "@/lib/auth/session";
 import { calculatePayrollRun } from "@/lib/payroll/calculator";
 import { employeeToRows, organizationToRow, statutoryRuleToRow } from "@/lib/supabase/mappers";
-import { uploadStorageFile } from "@/lib/supabase/storage";
-import { createSignedStorageUrl } from "@/lib/supabase/storage";
+import { createSignedStorageUrl, uploadStorageFile } from "@/lib/supabase/storage";
 import { getEmployees, getOrganizations, getStatutoryRules } from "@/lib/supabase/data";
 import { tryCreateSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -20,7 +19,9 @@ import {
   payrollRunSchema,
   employeeSchema,
   statutoryRuleSchema,
+  subscriptionSchema,
 } from "@/lib/validation/schemas";
+import { getBillingPlan } from "@/lib/billing/plans";
 
 export type ActionState = {
   ok: boolean;
@@ -775,4 +776,48 @@ export async function saveStatutoryRuleAction(_prevState: ActionState, formData:
   }
   revalidatePath("/settings/payroll-rules");
   return { ok: true, message: "Payroll rule saved." };
+}
+
+export async function saveSubscriptionAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = subscriptionSchema.safeParse({
+    organizationId: formData.get("organizationId"),
+    planCode: formData.get("planCode"),
+    billingEmail: formData.get("billingEmail"),
+    seats: formData.get("seats"),
+  });
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid billing details." };
+  const denied = await forbidden("company:update", parsed.data.organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: "Demo billing plan saved for preview." };
+
+  const plan = getBillingPlan(parsed.data.planCode);
+  const row = {
+    organization_id: parsed.data.organizationId,
+    plan_code: parsed.data.planCode,
+    status: "trialing",
+    seats: parsed.data.seats,
+    billing_email: parsed.data.billingEmail,
+    trial_ends_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  const { data: beforeValue } = await supabase
+    .from("organization_subscriptions")
+    .select("*")
+    .eq("organization_id", parsed.data.organizationId)
+    .maybeSingle();
+  const { error } = await supabase
+    .from("organization_subscriptions")
+    .upsert(row, { onConflict: "organization_id" });
+  if (error) return { ok: false, message: error.message };
+  await writeAuditLog({
+    organizationId: parsed.data.organizationId,
+    action: "Subscription plan updated",
+    entityType: "organization_subscription",
+    beforeValue: beforeValue ?? null,
+    afterValue: { ...row, planName: plan.name },
+  });
+  revalidatePath("/settings/billing");
+  revalidatePath("/settings");
+  return { ok: true, message: `${plan.name} plan saved. Connect Stripe before charging customers.` };
 }
