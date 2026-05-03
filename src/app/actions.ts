@@ -21,6 +21,7 @@ import {
   statutoryRuleSchema,
   subscriptionSchema,
   payrollVarianceSettingsSchema,
+  reportReviewSchema,
   unlockReviewSchema,
 } from "@/lib/validation/schemas";
 import { getBillingPlan } from "@/lib/billing/plans";
@@ -996,6 +997,49 @@ export async function savePayrollVarianceSettingsAction(_prevState: ActionState,
   });
   revalidatePath("/payroll");
   return { ok: true, message: "Variance thresholds saved." };
+}
+
+export async function reviewReportExportAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = reportReviewSchema.safeParse({
+    reportId: formData.get("reportId"),
+    organizationId: formData.get("organizationId"),
+    reviewStatus: formData.get("reviewStatus"),
+  });
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid report review." };
+  const denied = await forbidden("reports:export", parsed.data.organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: "Demo report review saved." };
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: beforeValue } = await supabase
+    .from("reports")
+    .select("*")
+    .eq("id", parsed.data.reportId)
+    .eq("organization_id", parsed.data.organizationId)
+    .maybeSingle();
+  const update = {
+    review_status: parsed.data.reviewStatus,
+    reviewed_by: user?.id,
+    reviewed_at: new Date().toISOString(),
+  };
+  const { error } = await supabase
+    .from("reports")
+    .update(update)
+    .eq("id", parsed.data.reportId)
+    .eq("organization_id", parsed.data.organizationId);
+  if (error) return { ok: false, message: error.message };
+  await writeAuditLog({
+    organizationId: parsed.data.organizationId,
+    action: "Report template review updated",
+    entityType: "report",
+    entityId: parsed.data.reportId,
+    beforeValue: beforeValue ?? null,
+    afterValue: update,
+  });
+  revalidatePath("/reports");
+  return { ok: true, message: "Report review status saved." };
 }
 
 export async function saveStatutoryRuleAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {

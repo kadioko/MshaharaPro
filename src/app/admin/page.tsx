@@ -4,6 +4,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getOrganizationSetupHealth } from "@/lib/health/setup-health";
 import { getEmployees, getOrganizationSubscription, getOrganizations, getPayrollRuns } from "@/lib/supabase/data";
 
 export default async function AdminPage() {
@@ -30,18 +31,15 @@ export default async function AdminPage() {
             <TableBody>
               {organizations.map((organization, index) => {
                 const latestRun = payrollRuns.find((run) => run.organizationId === organization.id);
-                const missingSetup = [
-                  !organization.tin ? "TIN" : "",
-                  !organization.nssfEmployerNumber ? "NSSF" : "",
-                  !organization.wcfRegistrationNumber ? "WCF" : "",
-                ].filter(Boolean);
+                const health = getOrganizationSetupHealth(organization, employees, payrollRuns, subscriptions[index]?.status);
+                const nextTask = health.tasks.find((task) => !task.done);
                 return (
                   <TableRow key={organization.id}>
                     <TableCell className="font-medium">{organization.name}</TableCell>
                     <TableCell><StatusBadge status={subscriptions[index]?.status ?? "not_configured"} /></TableCell>
                     <TableCell>{employees.filter((employee) => employee.organizationId === organization.id).length}</TableCell>
                     <TableCell>{latestRun ? <StatusBadge status={latestRun.status} /> : "None"}</TableCell>
-                    <TableCell>{missingSetup.length ? `Missing ${missingSetup.join(", ")}` : "Ready"}</TableCell>
+                    <TableCell>{health.score}% {nextTask ? `- ${nextTask.label}` : "- Ready"}</TableCell>
                     <TableCell><Button asChild size="sm" variant="outline"><Link href="/settings">Open</Link></Button></TableCell>
                   </TableRow>
                 );

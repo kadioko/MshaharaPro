@@ -105,3 +105,9 @@ export const bulkEmployeeRowSchema = employeeSchema.extend({
   employeeNumber: z.string().min(1),
   fullName: z.string().min(2),
 });
+
+export const reportReviewSchema = z.object({
+  reportId: z.string().min(1),
+  organizationId: z.string().min(1),
+  reviewStatus: z.enum(["Draft", "Needs Review", "Approved Template"]),
+});

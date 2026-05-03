@@ -361,6 +361,32 @@ export async function getPayrollUnlockRequests(payrollRunId: string): Promise<Pa
   }));
 }
 
+export async function getPendingPayrollUnlockRequests(organizationId?: string): Promise<PayrollUnlockRequest[]> {
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return [];
+  let query = supabase
+    .from("payroll_unlock_requests")
+    .select("*")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: row.id,
+    organizationId: row.organization_id,
+    payrollRunId: row.payroll_run_id,
+    status: row.status,
+    reason: row.reason,
+    requestedBy: row.requested_by ?? undefined,
+    reviewedBy: row.reviewed_by ?? undefined,
+    reviewedAt: row.reviewed_at ?? undefined,
+    reviewNote: row.review_note ?? undefined,
+    createdAt: row.created_at,
+  }));
+}
+
 export async function getPayrollVarianceSettings(organizationId: string): Promise<PayrollVarianceSettings> {
   const supabase = await tryCreateSupabaseServerClient();
   if (!supabase) {

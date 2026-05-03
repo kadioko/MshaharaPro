@@ -1,5 +1,6 @@
 import { saveStatutoryRuleAction } from "@/app/actions";
 import { AppShell } from "@/components/app/app-shell";
+import { RuleTestCalculator } from "@/components/app/rule-test-calculator";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ export default async function PayrollRulesPage() {
 
   return (
     <AppShell title="Payroll rules admin" description="Configurable rates, thresholds, caps, formula types, notes, effective dates, and active status." requiredPermission="rules:manage">
+      <RuleTestCalculator rules={rules} />
       <Card>
         <CardHeader><CardTitle>Statutory rules</CardTitle></CardHeader>
         <CardContent>

@@ -8,15 +8,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getCurrentSession } from "@/lib/auth/session";
-import { getEmployees, getOrganizations, getPayrollRuns } from "@/lib/supabase/data";
+import { getOrganizationSetupHealth } from "@/lib/health/setup-health";
+import { getEmployees, getOrganizationSubscription, getOrganizations, getPayrollRuns, getPendingPayrollUnlockRequests } from "@/lib/supabase/data";
 
 export default async function DashboardPage() {
-  const [session, employees, organizations, payrollRuns] = await Promise.all([
+  const [session, employees, organizations, payrollRuns, pendingUnlocks] = await Promise.all([
     getCurrentSession(),
     getEmployees(),
     getOrganizations(),
     getPayrollRuns(),
+    getPendingPayrollUnlockRequests(),
   ]);
+  const subscriptions = await Promise.all(organizations.map((organization) => getOrganizationSubscription(organization.id)));
+  const healthByOrg = new Map(organizations.map((organization, index) => [
+    organization.id,
+    getOrganizationSetupHealth(organization, employees, payrollRuns, subscriptions[index]?.status),
+  ]));
+  const missingDataTotal = Array.from(healthByOrg.values()).reduce((sum, health) => sum + health.missingEmployeeData, 0);
 
   if (session?.role === "employee") {
     const employee = employees[0];
@@ -47,8 +55,25 @@ export default async function DashboardPage() {
         <Metric title="Client companies" value={organizations.length} icon={Building2} />
         <Metric title="Active employees" value={employees.filter((item) => item.active).length} icon={Users} />
         <Metric title="Needs approval" value={payrollRuns.filter((item) => item.status === "Pending Approval").length} icon={Clock} />
-        <Metric title="Missing data" value={2} icon={AlertTriangle} />
+        <Metric title="Missing data" value={missingDataTotal} icon={AlertTriangle} />
       </div>
+      <Card className="mt-6">
+        <CardHeader><CardTitle>Action center</CardTitle></CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          {pendingUnlocks.length ? (
+            <ActionItem title="Unlock requests" description={`${pendingUnlocks.length} payroll unlock request(s) need review.`} href={`/payroll/${pendingUnlocks[0].payrollRunId}`} />
+          ) : null}
+          {organizations.slice(0, 3).map((organization) => {
+            const health = healthByOrg.get(organization.id);
+            const nextTask = health?.tasks.find((task) => !task.done);
+            return nextTask ? (
+              <ActionItem key={organization.id} title={organization.name} description={nextTask.label} href={nextTask.href} />
+            ) : (
+              <ActionItem key={organization.id} title={organization.name} description="Setup looks ready for payroll review." href="/payroll" />
+            );
+          })}
+        </CardContent>
+      </Card>
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.25fr]">
         <Card>
           <CardHeader><CardTitle>Payroll trend</CardTitle></CardHeader>
@@ -66,12 +91,13 @@ export default async function DashboardPage() {
               <TableBody>
                 {organizations.map((org) => {
                   const run = payrollRuns.find((item) => item.organizationId === org.id);
+                  const health = healthByOrg.get(org.id);
                   return (
                     <TableRow key={org.id}>
                       <TableCell className="font-medium">{org.name}<p className="text-xs text-muted-foreground">Deadline warning: month-end review due</p></TableCell>
                       <TableCell><StatusBadge status={run?.status ?? "Draft"} /></TableCell>
                       <TableCell>{org.employeeCount}</TableCell>
-                      <TableCell><Progress value={org.sdlApplicable ? 70 : 55} /></TableCell>
+                      <TableCell><Progress value={health?.score ?? 0} /></TableCell>
                       <TableCell><Button asChild size="sm" variant="outline"><Link href={run ? `/payroll/${run.id}` : "/payroll"}>Open payroll</Link></Button></TableCell>
                     </TableRow>
                   );
@@ -82,6 +108,16 @@ export default async function DashboardPage() {
         </Card>
       </div>
     </AppShell>
+  );
+}
+
+function ActionItem({ title, description, href }: { title: string; description: string; href: string }) {
+  return (
+    <div className="rounded-md border p-3">
+      <p className="font-medium">{title}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      <Button asChild className="mt-3" size="sm" variant="outline"><Link href={href}>Open</Link></Button>
+    </div>
   );
 }
 

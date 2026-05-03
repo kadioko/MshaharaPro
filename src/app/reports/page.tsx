@@ -1,4 +1,6 @@
 import { Download } from "lucide-react";
+import { reviewReportExportAction } from "@/app/actions";
+import { ActionMessageForm } from "@/components/app/action-message-form";
 import { AppShell } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,13 +42,23 @@ export default async function ReportsPage() {
         <CardHeader><CardTitle>Export history</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {exports.length ? exports.map((item) => (
-            <div key={item.id} className="grid gap-2 rounded-md border p-3 text-sm md:grid-cols-[1fr_auto_auto]">
+            <div key={item.id} className="grid gap-2 rounded-md border p-3 text-sm lg:grid-cols-[1fr_auto_auto_auto]">
               <div>
                 <p className="font-medium">{reportLabels[item.reportType as keyof typeof reportLabels] ?? item.reportType}</p>
                 <p className="text-xs text-muted-foreground">{item.templateVersion ?? "Unversioned"} - {new Date(item.createdAt).toLocaleString()}</p>
+                {item.reviewedAt ? <p className="text-xs text-muted-foreground">Reviewed {new Date(item.reviewedAt).toLocaleDateString()}</p> : null}
               </div>
-              <span className="text-muted-foreground">{item.reviewStatus}</span>
+              <ActionMessageForm action={reviewReportExportAction} label="Save review">
+                <input name="reportId" type="hidden" value={item.id} />
+                <input name="organizationId" type="hidden" value={organization.id} />
+                <select className="h-8 rounded-md border bg-background px-2 text-xs" name="reviewStatus" defaultValue={item.reviewStatus}>
+                  <option value="Draft">Draft</option>
+                  <option value="Needs Review">Needs Review</option>
+                  <option value="Approved Template">Approved Template</option>
+                </select>
+              </ActionMessageForm>
               <span className="uppercase text-muted-foreground">{item.format}</span>
+              {item.storagePath ? <Button asChild size="sm" variant="outline"><a href={`/api/reports/download/${item.id}`}>Download</a></Button> : null}
             </div>
           )) : <p className="text-sm text-muted-foreground">No exported reports yet.</p>}
         </CardContent>
