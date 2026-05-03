@@ -13,4 +13,11 @@ describe("storage-backed exports", () => {
     expect(source).toContain('uploadStorageFile("reports"');
     expect(source).toContain('from("reports")');
   });
+
+  it("snippe webhook verifies signatures before updating subscriptions", () => {
+    const source = readFileSync("src/app/api/snippe/webhook/route.ts", "utf8");
+    expect(source).toContain("verifySnippeWebhookSignature");
+    expect(source).toContain("snippe_session_reference");
+    expect(source).toContain("organization_subscriptions");
+  });
 });

@@ -1,7 +1,7 @@
 import { auditLogs, employees, organizations, payrollRuns } from "@/lib/demo-data";
 import { getCurrentSession } from "@/lib/auth/session";
 import { initialStatutoryRules } from "@/lib/payroll/rules";
-import type { PayrollLineItem, StatutoryRule } from "@/lib/types";
+import type { BillingEvent, PayrollLineItem, PayrollUnlockRequest, PayrollVarianceSettings, StatutoryRule } from "@/lib/types";
 import { getBillingPlan } from "@/lib/billing/plans";
 import { tryCreateSupabaseServerClient } from "./server";
 
@@ -254,6 +254,13 @@ export async function getOrganizationSubscription(organizationId: string) {
       status: "trialing",
       seats: 1,
       billingEmail: "billing@example.co.tz",
+      snippeSessionReference: undefined,
+      snippeCheckoutUrl: undefined,
+      snippePaymentLinkUrl: undefined,
+      snippePaidAt: undefined,
+      paymentFailureCount: 0,
+      lastPaymentFailedAt: undefined,
+      paymentFailureReason: undefined,
       trialEndsAt: undefined,
       currentPeriodEndsAt: undefined,
     };
@@ -274,6 +281,13 @@ export async function getOrganizationSubscription(organizationId: string) {
       status: "not_configured",
       seats: 1,
       billingEmail: "",
+      snippeSessionReference: undefined,
+      snippeCheckoutUrl: undefined,
+      snippePaymentLinkUrl: undefined,
+      snippePaidAt: undefined,
+      paymentFailureCount: 0,
+      lastPaymentFailedAt: undefined,
+      paymentFailureReason: undefined,
       trialEndsAt: undefined,
       currentPeriodEndsAt: undefined,
     };
@@ -287,7 +301,83 @@ export async function getOrganizationSubscription(organizationId: string) {
     status: data.status,
     seats: Number(data.seats),
     billingEmail: data.billing_email,
+    snippeSessionReference: data.snippe_session_reference ?? undefined,
+    snippeCheckoutUrl: data.snippe_checkout_url ?? undefined,
+    snippePaymentLinkUrl: data.snippe_payment_link_url ?? undefined,
+    snippePaidAt: data.snippe_paid_at ?? undefined,
+    paymentFailureCount: Number(data.payment_failure_count ?? 0),
+    lastPaymentFailedAt: data.last_payment_failed_at ?? undefined,
+    paymentFailureReason: data.payment_failure_reason ?? undefined,
     trialEndsAt: data.trial_ends_at ?? undefined,
     currentPeriodEndsAt: data.current_period_ends_at ?? undefined,
+  };
+}
+
+export async function getBillingEvents(organizationId: string): Promise<BillingEvent[]> {
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("billing_events")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: row.id,
+    organizationId: row.organization_id,
+    subscriptionId: row.subscription_id ?? undefined,
+    eventType: row.event_type,
+    status: row.status,
+    amount: row.amount === null ? undefined : Number(row.amount),
+    currency: row.currency ?? undefined,
+    provider: row.provider,
+    providerReference: row.provider_reference ?? undefined,
+    message: row.message ?? undefined,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function getPayrollUnlockRequests(payrollRunId: string): Promise<PayrollUnlockRequest[]> {
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("payroll_unlock_requests")
+    .select("*")
+    .eq("payroll_run_id", payrollRunId)
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: row.id,
+    organizationId: row.organization_id,
+    payrollRunId: row.payroll_run_id,
+    status: row.status,
+    reason: row.reason,
+    requestedBy: row.requested_by ?? undefined,
+    reviewedBy: row.reviewed_by ?? undefined,
+    reviewedAt: row.reviewed_at ?? undefined,
+    reviewNote: row.review_note ?? undefined,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function getPayrollVarianceSettings(organizationId: string): Promise<PayrollVarianceSettings> {
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) {
+    return { organizationId, grossThresholdPercent: 10, netThresholdPercent: 10, employerCostThresholdPercent: 10 };
+  }
+  const { data, error } = await supabase
+    .from("payroll_variance_settings")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (error || !data) {
+    return { organizationId, grossThresholdPercent: 10, netThresholdPercent: 10, employerCostThresholdPercent: 10 };
+  }
+  return {
+    organizationId,
+    grossThresholdPercent: Number(data.gross_threshold_percent ?? 10),
+    netThresholdPercent: Number(data.net_threshold_percent ?? 10),
+    employerCostThresholdPercent: Number(data.employer_cost_threshold_percent ?? 10),
   };
 }

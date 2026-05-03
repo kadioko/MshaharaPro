@@ -31,6 +31,8 @@ Production:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_PROJECT_REF`
 - Optional `SENTRY_DSN`
+- Optional `SNIPPE_API_KEY`
+- Optional `SNIPPE_WEBHOOK_SECRET`
 
 Preview:
 

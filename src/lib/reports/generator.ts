@@ -27,50 +27,66 @@ export const reportLabels: Record<ReportType, string> = {
 
 export const reportTypes = Object.keys(reportLabels) as ReportType[];
 
-export const reportTemplateNotes: Record<ReportType, { audience: string; reviewStatus: string; requiredFields: string[] }> = {
+export const reportTemplateNotes: Record<ReportType, { audience: string; reviewStatus: string; requiredFields: string[]; version: string; sourceUrl?: string; filingNotes?: string[] }> = {
   "payroll-summary": {
     audience: "Owners, directors, payroll managers",
     reviewStatus: "Operational summary; accountant review recommended before approval.",
+    version: "MshaharaPro v1 operational",
     requiredFields: ["Company", "Payroll month", "Employee count", "Gross pay", "Net pay", "Employer cost"],
   },
   "employee-register": {
     audience: "HR, payroll managers, auditors",
     reviewStatus: "Internal register; confirm employee identity fields before audit use.",
+    version: "MshaharaPro v1 operational",
     requiredFields: ["Employee number", "Name", "Department", "Job title", "Email", "Phone", "Status"],
   },
   paye: {
     audience: "TRA PAYE preparation",
-    reviewStatus: "Template scaffold. Final TRA filing format must be reviewed by a qualified Tanzanian tax advisor.",
-    requiredFields: ["Employer TIN", "Employee TIN", "Taxable pay", "PAYE withheld", "Payroll month"],
+    reviewStatus: "Accountant review required before TRA submission.",
+    version: "Review packet v1 - PAYE monthly preparation",
+    sourceUrl: "https://paymentregistration.tra.go.tz/payecalculator/paye.htm",
+    filingNotes: ["Taxable pay is shown after employee NSSF deduction.", "Confirm current PAYE bracket/rate rules in Payroll Rules before export."],
+    requiredFields: ["Employer TIN", "TRA region", "Employee TIN", "NIDA", "Taxable pay", "PAYE withheld", "Payroll month"],
   },
   nssf: {
     audience: "NSSF contribution preparation",
-    reviewStatus: "Template scaffold. Confirm current NSSF schedule format before official remittance.",
-    requiredFields: ["Employer NSSF number", "Employee NSSF number", "Gross pay", "Employee share", "Employer share"],
+    reviewStatus: "Accountant review required before NSSF remittance.",
+    version: "Review packet v1 - NSSF/CON.05 preparation",
+    sourceUrl: "https://www.nssf.go.tz/pages/rate-of-contributions",
+    filingNotes: ["Current public NSSF guidance references Form NSSF/CON.05 support particulars.", "Employee share should not exceed the configured employee-share cap."],
+    requiredFields: ["Employer NSSF number", "Employee NSSF number", "NIDA", "Gross pay", "Employee share", "Employer share", "Total contribution"],
   },
   wcf: {
     audience: "WCF contribution preparation",
-    reviewStatus: "Template scaffold. Confirm current WCF portal fields before official submission.",
-    requiredFields: ["WCF registration number", "Employee number", "Gross earnings", "WCF contribution"],
+    reviewStatus: "Accountant review required before WCF portal submission.",
+    version: "Review packet v1 - WCF monthly contribution",
+    sourceUrl: "https://www.wcf.go.tz/index.php/pages/contribution",
+    filingNotes: ["WCF is employer-paid and should not be deducted from employees.", "Gross earnings include basic salary plus fixed allowances according to current public WCF guidance."],
+    requiredFields: ["WCF registration number", "Employee number", "NIDA", "Gross earnings", "WCF contribution", "Employer paid"],
   },
   sdl: {
     audience: "TRA SDL preparation",
-    reviewStatus: "Template scaffold. Confirm SDL applicability and current TRA format before submission.",
-    requiredFields: ["Employer TIN", "Employee count", "SDL applicable", "Monthly emoluments", "SDL amount"],
+    reviewStatus: "Accountant review required before TRA submission.",
+    version: "Review packet v1 - SDL monthly preparation",
+    filingNotes: ["SDL applicability is controlled by company settings and payroll rules.", "Confirm current TRA SDL rate and employee threshold before filing."],
+    requiredFields: ["Employer TIN", "Company", "Employee count", "SDL applicable", "Monthly emoluments", "SDL amount", "Rate source"],
   },
   "bank-schedule": {
     audience: "Bank or mobile-money payment preparation",
     reviewStatus: "Operational payment schedule; verify bank account details before upload/payment.",
+    version: "MshaharaPro v1 payment schedule",
     requiredFields: ["Employee number", "Name", "Bank", "Account", "Mobile money", "Net pay", "Payment reference"],
   },
   "department-cost": {
     audience: "Management accounts and cost review",
     reviewStatus: "Internal management report.",
+    version: "MshaharaPro v1 management report",
     requiredFields: ["Department", "Total employer cost"],
   },
   "loan-advance": {
     audience: "Payroll deductions and staff advance tracking",
     reviewStatus: "Internal schedule; reconcile against signed loan/advance records.",
+    version: "MshaharaPro v1 deductions schedule",
     requiredFields: ["Employee number", "Name", "Loan repayment"],
   },
 };
@@ -100,6 +116,9 @@ export async function generateReportPdf(
   doc.moveDown();
   doc.fontSize(11).text(organization.name);
   doc.text("Payroll month: April 2026");
+  doc.text(`Template: ${reportTemplateNotes[type].version}`);
+  doc.text(`Review status: ${reportTemplateNotes[type].reviewStatus}`);
+  if (reportTemplateNotes[type].sourceUrl) doc.text(`Reference: ${reportTemplateNotes[type].sourceUrl}`);
   doc.moveDown();
 
   const [headers, ...rows] = buildRows(type, organization, employees, items);
@@ -136,51 +155,62 @@ function buildRows(type: ReportType, organization: Organization, employees: Empl
 
   if (type === "paye") {
     return [
-      ["Employer TIN", "Employee TIN", "Employee No", "Employee Name", "Taxable Pay", "PAYE Withheld", "Payroll Month"],
+      ["Employer TIN", "TRA Region", "Employee TIN", "NIDA", "Employee No", "Employee Name", "Gross Pay", "Employee NSSF", "Taxable Pay", "PAYE Withheld", "Payroll Month", "Review Status"],
       ...base.map(({ item, employee }) => [
         organization.tin,
+        organization.traTaxRegion ?? "",
         employee?.tin ?? "MISSING",
+        employee?.nida ?? "MISSING",
         employee?.employeeNumber ?? "",
         employee?.fullName ?? "",
+        item.grossPay,
+        item.nssfEmployee,
         item.grossPay - item.nssfEmployee,
         item.paye,
         "April 2026",
+        "Accountant review required",
       ]),
     ];
   }
 
   if (type === "nssf") {
     return [
-      ["Employer NSSF No", "Employee NSSF No", "Employee No", "Employee Name", "Gross Pay", "Employee Share", "Employer Share", "Total Contribution"],
+      ["Employer NSSF No", "Employee NSSF No", "NIDA", "Employee No", "Employee Name", "Gross Pay", "Employee Share", "Employer Share", "Total Contribution", "Support Form", "Review Status"],
       ...base.map(({ item, employee }) => [
         organization.nssfEmployerNumber,
         employee?.nssfNumber ?? "MISSING",
+        employee?.nida ?? "MISSING",
         employee?.employeeNumber ?? "",
         employee?.fullName ?? "",
         item.grossPay,
         item.nssfEmployee,
         item.employerNssf,
         item.nssfEmployee + item.employerNssf,
+        "NSSF/CON.05 review packet",
+        "Accountant review required",
       ]),
     ];
   }
 
   if (type === "wcf") {
     return [
-      ["WCF Registration No", "Employee No", "Employee Name", "Gross Earnings", "WCF Contribution"],
+      ["WCF Registration No", "Employee No", "NIDA", "Employee Name", "Gross Earnings", "WCF Contribution", "Paid By", "Review Status"],
       ...base.map(({ item, employee }) => [
         organization.wcfRegistrationNumber,
         employee?.employeeNumber ?? "",
+        employee?.nida ?? "MISSING",
         employee?.fullName ?? "",
         item.grossPay,
         item.wcf,
+        "Employer",
+        "Accountant review required",
       ]),
     ];
   }
 
   if (type === "sdl") {
     return [
-      ["Employer TIN", "Company", "Employee Count", "SDL Applicable", "Total Monthly Emoluments", "SDL Amount"],
+      ["Employer TIN", "Company", "Employee Count", "SDL Applicable", "Total Monthly Emoluments", "SDL Amount", "Config Source", "Review Status"],
       [
         organization.tin,
         organization.name,
@@ -188,6 +218,8 @@ function buildRows(type: ReportType, organization: Organization, employees: Empl
         organization.sdlApplicable ? "Yes" : "No",
         items.reduce((sum, item) => sum + item.grossPay, 0),
         items.reduce((sum, item) => sum + item.sdlAllocation, 0),
+        "Payroll Rules + company SDL setting",
+        "Accountant review required",
       ],
     ];
   }

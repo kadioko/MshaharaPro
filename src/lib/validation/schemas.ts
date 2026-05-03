@@ -85,3 +85,18 @@ export const subscriptionSchema = z.object({
   billingEmail: z.string().email(),
   seats: z.coerce.number().int().positive(),
 });
+
+export const unlockReviewSchema = z.object({
+  requestId: z.string().min(1),
+  organizationId: z.string().min(1),
+  payrollRunId: z.string().min(1),
+  decision: z.enum(["approved", "denied"]),
+  reviewNote: z.string().min(8, "Add a review note for the audit trail."),
+});
+
+export const payrollVarianceSettingsSchema = z.object({
+  organizationId: z.string().min(1),
+  grossThresholdPercent: z.coerce.number().min(0).max(100),
+  netThresholdPercent: z.coerce.number().min(0).max(100),
+  employerCostThresholdPercent: z.coerce.number().min(0).max(100),
+});

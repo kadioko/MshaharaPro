@@ -2,7 +2,26 @@
 
 Use this document after every major build pass to decide what to work on next.
 
-## 1. Role Smoke Tests
+## Completed Upgrade Areas
+
+- Real Supabase Auth users and live app seed data
+- Multi-tenant RLS verification across admin, accountant, owner, payroll manager, and employee
+- Employee self-service restrictions
+- Employee edit and deactivate/reactivate
+- Invite create/list/revoke/resend/copy-link UX
+- Document upload/list/delete and inline signed download links
+- Payroll adjustment add/list/edit/delete
+- Payroll run create/status transitions
+- Payroll workflow guardrails: valid status transitions, required approval notes, calculated-before-approval checks, unlock request audit logging
+- Month-over-month payroll variance view
+- Payroll timeline from audit logs
+- First-login onboarding checklist, invite prefill, plan suggestion, and billing redirect
+- Rule version history table
+- Report template notes and accountant review packet
+- Optional Sentry-compatible monitoring hook
+- Snippe checkout session creation and webhook subscription activation scaffolding
+
+## Role Smoke Tests
 
 Test with all seeded accounts:
 
@@ -18,7 +37,7 @@ Command:
 npm run supabase:verify-rls
 ```
 
-## 2. End-to-End Payroll Workflow
+## End-to-End Payroll Workflow
 
 Test this path:
 
@@ -34,59 +53,60 @@ Test this path:
 10. Lock payroll
 11. Mark paid
 
-## 3. CRUD Polish Backlog
+## Next Upgrade Ideas
 
-Done or partially done:
+### 1. Snippe Billing Hardening
 
-- Employee edit and deactivate/reactivate
-- Invite create/list/revoke
-- Document upload/list/delete
-- Payroll adjustment add/list/delete
-- Payroll run create/status transitions
+- Apply `supabase/billing_subscriptions.sql`
+- Add Snippe env vars in Vercel
+- Configure Snippe webhook URL
+- Create a test checkout and verify webhook activation
+- Add billing history table
+- Add payment failure handling and retry messaging
 
-Next polish:
+### 2. Workflow Polish
 
-- Invite resend/copy-link UX
-- Document signed download button with visible URL/result state
-- Inline edit for adjustments
-- Cancel/delete draft payroll runs with stronger guardrails
-- Approval comments displayed in payroll timeline
-- Rule version history and rollback UI
+- Add approval comment templates for common accountant review notes
+- Add an explicit approver-facing unlock approval/deny queue
+- Add payroll variance thresholds and warnings when gross/net changes exceed a configured percentage
+- Add bulk employee import with validation preview
 
-## 4. Statutory Reports
+### 3. Report Finalization
 
-Current report templates are scaffolds for PAYE, NSSF, WCF, and SDL.
+- Accountant sign-off on PAYE, NSSF, WCF, SDL templates
+- Template version locking by effective date
+- Reviewed / Draft / Needs review badges
+- Company logo and letterhead on PDF reports
+- Export history table with storage links
 
-Before production:
+### 4. SaaS Admin Operations
 
-- Review fields with a qualified Tanzanian accountant or tax advisor
-- Confirm filing/upload formats
-- Confirm current rates, thresholds, caps, exemptions, and rounding
-- Version report templates by effective date
+- Platform admin organization list
+- Subscription status dashboard
+- Tenant health checklist
+- Support diagnostics without exposing unnecessary payroll data
+- Monitoring dashboard and release checklist
 
-## 5. Production Readiness
+### 5. Customer Onboarding Assets
+
+- Sample employee import CSV
+- Payroll setup checklist PDF
+- Accountant pilot onboarding script
+- Help center pages for each role
+
+## Production Readiness
 
 Before launch:
 
 - Revoke temporary Supabase access token
 - Add Vercel Preview env vars if previews are used
 - Set `SENTRY_DSN` or enable Vercel Observability
+- Set `SNIPPE_API_KEY` and `SNIPPE_WEBHOOK_SECRET`
+- Apply `supabase/billing_subscriptions.sql`
 - Run `npm run verify`
 - Run `npm run supabase:verify-rls`
 - Deploy to Vercel
 - Test live login for all roles
 - Generate a payslip and export one report in production
+- Create one Snippe checkout and confirm webhook activation
 - Check Vercel logs/Sentry for errors
-
-## 6. Product Priorities
-
-Recommended next build order:
-
-1. Approval timeline with comments
-2. Rule version history UI
-3. Document download UX
-4. Invite resend/copy-link UX
-5. Final statutory report review and template locking
-6. Stripe checkout and subscription webhooks
-7. Production monitoring dashboards
-8. Customer onboarding checklist and sample import templates

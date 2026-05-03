@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, Download, Lock, Send } from "lucide-react";
-import { addPayrollAdjustmentAction, calculateAndPersistPayrollAction, deletePayrollAdjustmentAction, transitionPayrollRunWithCommentAction, updatePayrollAdjustmentAction } from "@/app/actions";
+import { addPayrollAdjustmentAction, calculateAndPersistPayrollAction, deletePayrollAdjustmentAction, requestPayrollUnlockAction, reviewPayrollUnlockRequestAction, savePayrollVarianceSettingsAction, transitionPayrollRunWithCommentAction, updatePayrollAdjustmentAction } from "@/app/actions";
 import { ActionForm } from "@/components/app/action-form";
 import { ActionMessageForm } from "@/components/app/action-message-form";
 import { AppShell } from "@/components/app/app-shell";
@@ -15,11 +15,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { adjustments } from "@/lib/demo-data";
 import { calculatePayrollRun } from "@/lib/payroll/calculator";
 import { money, monthLabel } from "@/lib/format";
-import { getAuditLogs, getEmployees, getOrganizations, getPayrollAdjustments, getPayrollRunItems, getPayrollRuns, getStatutoryRules } from "@/lib/supabase/data";
+import { getAuditLogs, getEmployees, getOrganizations, getPayrollAdjustments, getPayrollRunItems, getPayrollRuns, getPayrollUnlockRequests, getPayrollVarianceSettings, getStatutoryRules } from "@/lib/supabase/data";
 
 export default async function PayrollDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [employees, organizations, payrollRuns, rules, persistedItems, payrollAdjustments, auditLogs] = await Promise.all([
+  const [employees, organizations, payrollRuns, rules, persistedItems, payrollAdjustments, auditLogs, unlockRequests] = await Promise.all([
     getEmployees(),
     getOrganizations(),
     getPayrollRuns(),
@@ -27,19 +27,28 @@ export default async function PayrollDetailPage({ params }: { params: Promise<{ 
     getPayrollRunItems(id),
     getPayrollAdjustments(id),
     getAuditLogs(),
+    getPayrollUnlockRequests(id),
   ]);
   const run = payrollRuns.find((item) => item.id === id);
   if (!run) notFound();
   const org = organizations.find((item) => item.id === run.organizationId)!;
+  const previousRun = payrollRuns
+    .filter((item) => item.organizationId === org.id && item.id !== run.id && item.month < run.month)
+    .sort((a, b) => b.month.localeCompare(a.month))[0];
+  const [previousItems, varianceSettings] = await Promise.all([
+    previousRun ? getPayrollRunItems(previousRun.id) : Promise.resolve([]),
+    getPayrollVarianceSettings(org.id),
+  ]);
   const runEmployees = employees.filter((item) => item.organizationId === org.id);
   const items = persistedItems.length ? persistedItems : calculatePayrollRun(org, runEmployees, adjustments, rules);
   const totals = items.reduce((acc, item) => ({ gross: acc.gross + item.grossPay, net: acc.net + item.netPay, employer: acc.employer + item.totalEmployerCost }), { gross: 0, net: 0, employer: 0 });
+  const previousTotals = previousItems.reduce((acc, item) => ({ gross: acc.gross + item.grossPay, net: acc.net + item.netPay, employer: acc.employer + item.totalEmployerCost }), { gross: 0, net: 0, employer: 0 });
   const warnings = items.flatMap((item) => item.warnings.map((warning) => `${runEmployees.find((employee) => employee.id === item.employeeId)?.fullName}: ${warning}`));
   const timeline = auditLogs.filter((log) => log.entityId === run.id || (log.entityType === "payroll_run" && log.organizationId === org.id)).slice(0, 12);
 
   return (
     <AppShell title={`${org.name} payroll`} description={`${monthLabel(run.month)} · configurable statutory calculation preview`} requiredPermission="payroll:read">
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap items-start gap-2">
         <StatusBadge status={run.status} />
         <form action={async () => {
           "use server";
@@ -52,6 +61,13 @@ export default async function PayrollDetailPage({ params }: { params: Promise<{ 
         <TransitionButton runId={run.id} organizationId={org.id} status="Locked" label="Lock" />
         <TransitionButton runId={run.id} organizationId={org.id} status="Paid" label="Mark paid" />
         <TransitionButton runId={run.id} organizationId={org.id} status="Cancelled" label="Cancel" />
+        {run.status === "Locked" || run.status === "Paid" ? (
+          <ActionMessageForm action={requestPayrollUnlockAction} label="Request unlock">
+            <input name="payrollRunId" type="hidden" value={run.id} />
+            <input name="organizationId" type="hidden" value={org.id} />
+            <Input className="h-8 w-52 text-xs" name="comment" placeholder="Unlock reason" required />
+          </ActionMessageForm>
+        ) : null}
         <Button asChild size="sm"><Link href={`/api/payslips/${items[0]?.employeeId}?run=${run.id}`}><Download className="h-4 w-4" /> Download first payslip PDF</Link></Button>
       </div>
       {warnings.length ? (
@@ -66,6 +82,61 @@ export default async function PayrollDetailPage({ params }: { params: Promise<{ 
         <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Net pay</p><p className="text-2xl font-semibold">{money(totals.net)}</p></CardContent></Card>
         <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Total employer cost</p><p className="text-2xl font-semibold">{money(totals.employer)}</p></CardContent></Card>
       </div>
+      <Card className="mb-6">
+        <CardHeader><CardTitle>Variance vs prior payroll</CardTitle></CardHeader>
+        <CardContent>
+          {previousRun && previousItems.length ? (
+            <div className="grid gap-4 text-sm md:grid-cols-3">
+              <VarianceMetric label="Gross pay" current={totals.gross} previous={previousTotals.gross} threshold={varianceSettings.grossThresholdPercent} />
+              <VarianceMetric label="Net pay" current={totals.net} previous={previousTotals.net} threshold={varianceSettings.netThresholdPercent} />
+              <VarianceMetric label="Employer cost" current={totals.employer} previous={previousTotals.employer} threshold={varianceSettings.employerCostThresholdPercent} />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No persisted prior payroll is available for comparison yet.</p>
+          )}
+          <ActionMessageForm action={savePayrollVarianceSettingsAction} label="Save thresholds">
+            <input name="organizationId" type="hidden" value={org.id} />
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <div className="space-y-1">
+                <Label htmlFor="grossThresholdPercent">Gross warning %</Label>
+                <Input id="grossThresholdPercent" name="grossThresholdPercent" type="number" min="0" max="100" defaultValue={varianceSettings.grossThresholdPercent} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="netThresholdPercent">Net warning %</Label>
+                <Input id="netThresholdPercent" name="netThresholdPercent" type="number" min="0" max="100" defaultValue={varianceSettings.netThresholdPercent} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="employerCostThresholdPercent">Employer cost warning %</Label>
+                <Input id="employerCostThresholdPercent" name="employerCostThresholdPercent" type="number" min="0" max="100" defaultValue={varianceSettings.employerCostThresholdPercent} />
+              </div>
+            </div>
+          </ActionMessageForm>
+        </CardContent>
+      </Card>
+      <Card className="mb-6">
+        <CardHeader><CardTitle>Unlock review queue</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          {unlockRequests.length ? unlockRequests.map((request) => (
+            <div key={request.id} className="rounded-md border p-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <StatusBadge status={request.status} />
+                  <p className="mt-2 text-sm">{request.reason}</p>
+                  {request.reviewNote ? <p className="mt-1 text-xs text-muted-foreground">Review: {request.reviewNote}</p> : null}
+                </div>
+                {request.status === "pending" ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <UnlockReviewForm requestId={request.id} organizationId={org.id} payrollRunId={run.id} decision="approved" />
+                    <UnlockReviewForm requestId={request.id} organizationId={org.id} payrollRunId={run.id} decision="denied" />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )) : (
+            <p className="text-sm text-muted-foreground">No unlock requests for this payroll run.</p>
+          )}
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader><CardTitle>Calculation details</CardTitle></CardHeader>
         <CardContent>
@@ -180,19 +251,43 @@ export default async function PayrollDetailPage({ params }: { params: Promise<{ 
 }
 
 function TransitionButton({ runId, organizationId, status, label, icon }: { runId: string; organizationId: string; status: "Pending Approval" | "Approved" | "Locked" | "Paid" | "Cancelled"; label: string; icon?: "send" | "lock" }) {
+  const requiresComment = status !== "Pending Approval";
   return (
-    <form action={async (formData) => {
-      "use server";
-      await transitionPayrollRunWithCommentAction({ ok: false, message: "" }, formData);
-    }}>
+    <ActionMessageForm action={transitionPayrollRunWithCommentAction} label={label}>
       <input name="payrollRunId" type="hidden" value={runId} />
       <input name="organizationId" type="hidden" value={organizationId} />
       <input name="status" type="hidden" value={status} />
-      <input name="comment" type="hidden" value={`${label} from payroll detail`} />
-      <Button size="sm" variant="outline">
-        {icon === "send" ? <Send className="h-4 w-4" /> : icon === "lock" ? <Lock className="h-4 w-4" /> : null}
-        {label}
-      </Button>
-    </form>
+      {icon === "send" ? <Send className="h-4 w-4 text-muted-foreground" /> : icon === "lock" ? <Lock className="h-4 w-4 text-muted-foreground" /> : null}
+      <Input className="h-8 w-44 text-xs" name="comment" placeholder={requiresComment ? "Required note" : "Optional note"} required={requiresComment} />
+    </ActionMessageForm>
+  );
+}
+
+function VarianceMetric({ label, current, previous, threshold }: { label: string; current: number; previous: number; threshold: number }) {
+  const delta = current - previous;
+  const percent = previous ? (delta / previous) * 100 : 0;
+  const overThreshold = Math.abs(percent) > threshold;
+  const tone = overThreshold ? "text-destructive" : delta > 0 ? "text-amber-700 dark:text-amber-300" : delta < 0 ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground";
+  return (
+    <div className="rounded-md border p-3">
+      <p className="text-muted-foreground">{label}</p>
+      <p className="mt-1 font-semibold">{money(current)}</p>
+      <p className={`text-xs ${tone}`}>
+        {delta >= 0 ? "+" : ""}{money(delta)} ({percent >= 0 ? "+" : ""}{percent.toFixed(1)}%)
+      </p>
+      {overThreshold ? <p className="mt-1 text-xs text-destructive">Review required: exceeds {threshold}% threshold.</p> : null}
+    </div>
+  );
+}
+
+function UnlockReviewForm({ requestId, organizationId, payrollRunId, decision }: { requestId: string; organizationId: string; payrollRunId: string; decision: "approved" | "denied" }) {
+  return (
+    <ActionMessageForm action={reviewPayrollUnlockRequestAction} label={decision === "approved" ? "Approve unlock" : "Deny"}>
+      <input name="requestId" type="hidden" value={requestId} />
+      <input name="organizationId" type="hidden" value={organizationId} />
+      <input name="payrollRunId" type="hidden" value={payrollRunId} />
+      <input name="decision" type="hidden" value={decision} />
+      <Input className="h-8 w-48 text-xs" name="reviewNote" placeholder="Review note" required />
+    </ActionMessageForm>
   );
 }

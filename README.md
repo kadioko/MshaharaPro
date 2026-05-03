@@ -44,6 +44,8 @@ Set environment variables in Vercel dashboard:
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` - Your Supabase publishable key
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anon key
 - `SUPABASE_SERVICE_ROLE_KEY` - Server-only key for storage/report/payslip writes
+- `SNIPPE_API_KEY` - Server-only Snippe API key for hosted checkout sessions
+- `SNIPPE_WEBHOOK_SECRET` - Server-only Snippe webhook signing key
 
 ## Environment variables
 
@@ -54,6 +56,8 @@ NEXT_PUBLIC_SUPABASE_URL=your-project-url
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SNIPPE_API_KEY=your-snippe-api-key
+SNIPPE_WEBHOOK_SECRET=your-snippe-webhook-secret
 ```
 
 The app falls back to typed demo data in `src/lib/demo-data.ts` when Supabase is not configured. With Supabase configured, app data is read from the live project under RLS.
@@ -66,6 +70,7 @@ Apply:
 node scripts/run-supabase-cli.mjs link --project-ref your-project-ref
 node scripts/run-supabase-cli.mjs db query --linked --file supabase/schema.sql
 node scripts/run-supabase-cli.mjs db query --linked --file supabase/rls_employee_portal.sql
+node scripts/run-supabase-cli.mjs db query --linked --file supabase/billing_subscriptions.sql
 npm run supabase:seed-data
 npm run supabase:verify-rls
 ```
@@ -118,7 +123,8 @@ Do not treat these values as final statutory advice.
 | [Investor Brief](docs/INVESTOR_BRIEF.md) | Business opportunity, investor value, risks, and funding use |
 | [User Guide](docs/USER_GUIDE.md) | User types, workflows, and best practices |
 | [Business Strategy](docs/BUSINESS_STRATEGY.md) | Positioning, pricing direction, go-to-market, and launch checklist |
-| [Billing Strategy](docs/BILLING_STRATEGY.md) | SaaS plans, billing implementation status, and Stripe next steps |
+| [Billing Strategy](docs/BILLING_STRATEGY.md) | SaaS plans, Snippe checkout status, and payment next steps |
+| [Snippe Setup Checklist](docs/SNIPPE_SETUP_CHECKLIST.md) | Snippe API key, webhook secret, env setup, and test payment flow |
 | [Statutory Report Templates](docs/STATUTORY_REPORT_TEMPLATES.md) | Template fields and accountant-review checklist for statutory reports |
 | [Accountant Review Packet](docs/ACCOUNTANT_REVIEW_PACKET.md) | Sign-off worksheet for PAYE/NSSF/WCF/SDL review |
 | [Security Operations](docs/SECURITY_OPERATIONS.md) | Token cleanup, Vercel envs, monitoring, and release checks |

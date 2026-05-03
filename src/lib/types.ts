@@ -93,6 +93,40 @@ export type PayrollRun = {
   lockedAt?: string;
 };
 
+export type PayrollUnlockRequest = {
+  id: string;
+  organizationId: string;
+  payrollRunId: string;
+  status: "pending" | "approved" | "denied";
+  reason: string;
+  requestedBy?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewNote?: string;
+  createdAt: string;
+};
+
+export type PayrollVarianceSettings = {
+  organizationId: string;
+  grossThresholdPercent: number;
+  netThresholdPercent: number;
+  employerCostThresholdPercent: number;
+};
+
+export type BillingEvent = {
+  id: string;
+  organizationId: string;
+  subscriptionId?: string;
+  eventType: string;
+  status: string;
+  amount?: number;
+  currency?: string;
+  provider: string;
+  providerReference?: string;
+  message?: string;
+  createdAt: string;
+};
+
 export type PayrollLineItem = {
   employeeId: string;
   basicSalary: number;

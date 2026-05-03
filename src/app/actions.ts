@@ -20,8 +20,12 @@ import {
   employeeSchema,
   statutoryRuleSchema,
   subscriptionSchema,
+  payrollVarianceSettingsSchema,
+  unlockReviewSchema,
 } from "@/lib/validation/schemas";
 import { getBillingPlan } from "@/lib/billing/plans";
+import { createSnippeCheckoutSession } from "@/lib/billing/snippe";
+import type { PayrollStatus } from "@/lib/types";
 
 export type ActionState = {
   ok: boolean;
@@ -29,6 +33,27 @@ export type ActionState = {
   redirectTo?: string;
   url?: string;
 };
+
+type PayrollTransitionStatus = Exclude<PayrollStatus, "Draft">;
+
+const payrollTransitionPermissions: Record<PayrollTransitionStatus, string> = {
+  "Pending Approval": "payroll:submit",
+  Approved: "payroll:approve",
+  Locked: "payroll:approve",
+  Paid: "payroll:approve",
+  Cancelled: "payroll:approve",
+};
+
+const allowedPayrollTransitions: Record<PayrollStatus, PayrollTransitionStatus[]> = {
+  Draft: ["Pending Approval", "Cancelled"],
+  "Pending Approval": ["Approved", "Cancelled"],
+  Approved: ["Locked", "Paid", "Cancelled"],
+  Locked: ["Paid"],
+  Paid: [],
+  Cancelled: [],
+};
+
+const requiredPayrollTransitionComments = new Set<PayrollTransitionStatus>(["Approved", "Locked", "Paid", "Cancelled"]);
 
 const noSupabase: ActionState = {
   ok: false,
@@ -79,7 +104,7 @@ export async function createOrganizationAction(_prevState: ActionState, formData
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid company." };
 
   const supabase = await tryCreateSupabaseServerClient();
-  if (!supabase) return { ok: true, message: "Demo company setup saved for preview. Configure Supabase for persistence.", redirectTo: "/dashboard" };
+  if (!supabase) return { ok: true, message: "Demo company setup saved for preview. Configure Supabase for persistence.", redirectTo: "/settings/billing" };
 
   const {
     data: { user },
@@ -109,7 +134,7 @@ export async function createOrganizationAction(_prevState: ActionState, formData
     afterValue: parsed.data,
   });
   revalidatePath("/companies");
-  redirect("/dashboard");
+  redirect("/settings/billing");
 }
 
 export async function acceptInviteAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -529,11 +554,92 @@ export async function resendInviteAction(_prevState: ActionState, formData: Form
 export async function transitionPayrollRunWithCommentAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const payrollRunId = String(formData.get("payrollRunId") ?? "");
   const organizationId = String(formData.get("organizationId") ?? "");
-  const status = String(formData.get("status") ?? "") as "Pending Approval" | "Approved" | "Locked" | "Paid" | "Cancelled";
+  const status = String(formData.get("status") ?? "") as PayrollTransitionStatus;
   const comment = String(formData.get("comment") ?? "").trim();
   if (!payrollRunId || !organizationId || !status) return { ok: false, message: "Missing payroll transition details." };
-  const result = await transitionPayrollRunAction(payrollRunId, organizationId, status);
-  if (result.ok && comment) {
+  return transitionPayrollRunAction(payrollRunId, organizationId, status, comment);
+}
+
+export async function requestPayrollUnlockAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const payrollRunId = String(formData.get("payrollRunId") ?? "");
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const comment = String(formData.get("comment") ?? "").trim();
+  if (!payrollRunId || !organizationId) return { ok: false, message: "Missing payroll run details." };
+  if (comment.length < 8) return { ok: false, message: "Add a clear unlock reason before requesting review." };
+  const denied = await forbidden("payroll:submit", organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  const {
+    data: { user },
+  } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
+  if (supabase) {
+    const { error } = await supabase.from("payroll_unlock_requests").insert({
+      organization_id: organizationId,
+      payroll_run_id: payrollRunId,
+      reason: comment,
+      requested_by: user?.id,
+    });
+    if (error) return { ok: false, message: error.message };
+  }
+  await writeAuditLog({
+    organizationId,
+    action: "Payroll unlock requested",
+    entityType: "payroll_run",
+    entityId: payrollRunId,
+    afterValue: { comment },
+  });
+  revalidatePath(`/payroll/${payrollRunId}`);
+  return { ok: true, message: "Unlock request logged for an approver." };
+}
+
+export async function reviewPayrollUnlockRequestAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = unlockReviewSchema.safeParse({
+    requestId: formData.get("requestId"),
+    organizationId: formData.get("organizationId"),
+    payrollRunId: formData.get("payrollRunId"),
+    decision: formData.get("decision"),
+    reviewNote: formData.get("reviewNote"),
+  });
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid unlock review." };
+  const denied = await forbidden("payroll:approve", parsed.data.organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: `Demo unlock request ${parsed.data.decision}.` };
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: beforeValue } = await supabase
+    .from("payroll_unlock_requests")
+    .select("*")
+    .eq("id", parsed.data.requestId)
+    .eq("organization_id", parsed.data.organizationId)
+    .maybeSingle();
+  const update = {
+    status: parsed.data.decision,
+    reviewed_by: user?.id,
+    reviewed_at: new Date().toISOString(),
+    review_note: parsed.data.reviewNote,
+  };
+  const { error } = await supabase
+    .from("payroll_unlock_requests")
+    .update(update)
+    .eq("id", parsed.data.requestId)
+    .eq("organization_id", parsed.data.organizationId);
+  if (error) return { ok: false, message: error.message };
+  await writeAuditLog({
+    organizationId: parsed.data.organizationId,
+    action: `Payroll unlock ${parsed.data.decision}`,
+    entityType: "payroll_unlock_request",
+    entityId: parsed.data.requestId,
+    beforeValue: beforeValue ?? null,
+    afterValue: update,
+  });
+  revalidatePath(`/payroll/${parsed.data.payrollRunId}`);
+  return { ok: true, message: `Unlock request ${parsed.data.decision}.` };
+}
+
+async function writePayrollTransitionComment(organizationId: string, payrollRunId: string, status: PayrollTransitionStatus, comment: string) {
+  if (comment) {
     await writeAuditLog({
       organizationId,
       action: `Payroll comment: ${status}`,
@@ -542,7 +648,6 @@ export async function transitionPayrollRunWithCommentAction(_prevState: ActionSt
       afterValue: { comment },
     });
   }
-  return result;
 }
 
 export async function createInviteAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -696,20 +801,50 @@ export async function calculateAndPersistPayrollAction(
 export async function transitionPayrollRunAction(
   payrollRunId: string,
   organizationId: string,
-  status: "Pending Approval" | "Approved" | "Locked" | "Paid" | "Cancelled",
+  status: PayrollTransitionStatus,
+  comment = "",
 ) {
-  const permission = status === "Pending Approval" ? "payroll:submit" : status === "Approved" || status === "Locked" ? "payroll:approve" : "payroll:calculate";
-  const denied = await forbidden(permission, organizationId);
+  if (!(status in payrollTransitionPermissions)) {
+    return { ok: false, message: "Unknown payroll status." };
+  }
+  if (requiredPayrollTransitionComments.has(status) && comment.trim().length < 8) {
+    return { ok: false, message: `Add an approval note or reason before marking payroll ${status}.` };
+  }
+  const denied = await forbidden(payrollTransitionPermissions[status], organizationId);
   if (denied) return denied;
   const supabase = await tryCreateSupabaseServerClient();
   if (!supabase) return { ok: true, message: `Demo payroll marked ${status}.` };
+
+  const { data: beforeValue, error: readError } = await supabase
+    .from("payroll_runs")
+    .select("*")
+    .eq("id", payrollRunId)
+    .eq("organization_id", organizationId)
+    .single();
+  if (readError || !beforeValue) return { ok: false, message: "Payroll run not found." };
+
+  const currentStatus = beforeValue.status as PayrollStatus;
+  if (!allowedPayrollTransitions[currentStatus]?.includes(status)) {
+    return { ok: false, message: `Cannot move payroll from ${currentStatus} to ${status}.` };
+  }
+
+  const { count: itemCount, error: countError } = await supabase
+    .from("payroll_run_items")
+    .select("id", { count: "exact", head: true })
+    .eq("payroll_run_id", payrollRunId);
+  if (countError) return { ok: false, message: countError.message };
+  const requiresCalculatedPayroll = status === "Pending Approval" || status === "Approved" || status === "Locked" || status === "Paid";
+  if (requiresCalculatedPayroll && !itemCount) {
+    return { ok: false, message: "Calculate and save payroll before this workflow step." };
+  }
+
   const timestampColumn =
     status === "Pending Approval" ? "submitted_at" : status === "Approved" ? "approved_at" : status === "Locked" ? "locked_at" : status === "Paid" ? "paid_at" : null;
   const update: Record<string, string> = { status };
   if (timestampColumn) update[timestampColumn] = new Date().toISOString();
-  const { data: beforeValue } = await supabase.from("payroll_runs").select("*").eq("id", payrollRunId).single();
-  const { error } = await supabase.from("payroll_runs").update(update).eq("id", payrollRunId);
+  const { error } = await supabase.from("payroll_runs").update(update).eq("id", payrollRunId).eq("organization_id", organizationId);
   if (error) return { ok: false, message: error.message };
+  await writePayrollTransitionComment(organizationId, payrollRunId, status, comment.trim());
   await writeAuditLog({
     organizationId,
     action: `Payroll ${status.toLowerCase()}`,
@@ -719,7 +854,45 @@ export async function transitionPayrollRunAction(
     afterValue: update,
   });
   revalidatePath("/payroll");
+  revalidatePath(`/payroll/${payrollRunId}`);
   return { ok: true, message: `Payroll marked ${status}.` };
+}
+
+export async function savePayrollVarianceSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = payrollVarianceSettingsSchema.safeParse({
+    organizationId: formData.get("organizationId"),
+    grossThresholdPercent: formData.get("grossThresholdPercent"),
+    netThresholdPercent: formData.get("netThresholdPercent"),
+    employerCostThresholdPercent: formData.get("employerCostThresholdPercent"),
+  });
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid variance thresholds." };
+  const denied = await forbidden("company:update", parsed.data.organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: "Demo variance thresholds saved for preview." };
+  const row = {
+    organization_id: parsed.data.organizationId,
+    gross_threshold_percent: parsed.data.grossThresholdPercent,
+    net_threshold_percent: parsed.data.netThresholdPercent,
+    employer_cost_threshold_percent: parsed.data.employerCostThresholdPercent,
+    updated_at: new Date().toISOString(),
+  };
+  const { data: beforeValue } = await supabase
+    .from("payroll_variance_settings")
+    .select("*")
+    .eq("organization_id", parsed.data.organizationId)
+    .maybeSingle();
+  const { error } = await supabase.from("payroll_variance_settings").upsert(row, { onConflict: "organization_id" });
+  if (error) return { ok: false, message: error.message };
+  await writeAuditLog({
+    organizationId: parsed.data.organizationId,
+    action: "Payroll variance thresholds updated",
+    entityType: "payroll_variance_settings",
+    beforeValue: beforeValue ?? null,
+    afterValue: row,
+  });
+  revalidatePath("/payroll");
+  return { ok: true, message: "Variance thresholds saved." };
 }
 
 export async function saveStatutoryRuleAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -810,6 +983,20 @@ export async function saveSubscriptionAction(_prevState: ActionState, formData: 
     .from("organization_subscriptions")
     .upsert(row, { onConflict: "organization_id" });
   if (error) return { ok: false, message: error.message };
+  const { data: subscription } = await supabase
+    .from("organization_subscriptions")
+    .select("id")
+    .eq("organization_id", parsed.data.organizationId)
+    .maybeSingle();
+  await supabase.from("billing_events").insert({
+    organization_id: parsed.data.organizationId,
+    subscription_id: subscription?.id,
+    event_type: "plan_updated",
+    status: "recorded",
+    provider: "internal",
+    message: `${plan.name} plan selected`,
+    payload: { planCode: parsed.data.planCode, seats: parsed.data.seats },
+  });
   await writeAuditLog({
     organizationId: parsed.data.organizationId,
     action: "Subscription plan updated",
@@ -819,5 +1006,79 @@ export async function saveSubscriptionAction(_prevState: ActionState, formData: 
   });
   revalidatePath("/settings/billing");
   revalidatePath("/settings");
-  return { ok: true, message: `${plan.name} plan saved. Connect Stripe before charging customers.` };
+  return { ok: true, message: `${plan.name} plan saved. Create a Snippe checkout when you are ready to collect payment.` };
+}
+
+export async function createSnippeCheckoutAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = subscriptionSchema.safeParse({
+    organizationId: formData.get("organizationId"),
+    planCode: formData.get("planCode"),
+    billingEmail: formData.get("billingEmail"),
+    seats: formData.get("seats"),
+  });
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid billing details." };
+  const denied = await forbidden("company:update", parsed.data.organizationId);
+  if (denied) return denied;
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: false, message: "Supabase is required before creating Snippe checkout sessions." };
+
+  const plan = getBillingPlan(parsed.data.planCode);
+  const organizations = await getOrganizations();
+  const organization = organizations.find((item) => item.id === parsed.data.organizationId);
+  if (!organization) return { ok: false, message: "Organization not found." };
+
+  const checkout = await createSnippeCheckoutSession({
+    organizationId: organization.id,
+    organizationName: organization.name,
+    plan,
+    billingEmail: parsed.data.billingEmail,
+    seats: parsed.data.seats,
+  });
+  if (!checkout.ok) return { ok: false, message: checkout.error };
+
+  const row = {
+    organization_id: organization.id,
+    plan_code: parsed.data.planCode,
+    status: "trialing",
+    seats: parsed.data.seats,
+    billing_email: parsed.data.billingEmail,
+    snippe_session_reference: checkout.data.reference,
+    snippe_checkout_url: checkout.data.checkoutUrl,
+    snippe_payment_link_url: checkout.data.paymentLinkUrl,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase
+    .from("organization_subscriptions")
+    .upsert(row, { onConflict: "organization_id" });
+  if (error) return { ok: false, message: error.message };
+  const { data: subscription } = await supabase
+    .from("organization_subscriptions")
+    .select("id")
+    .eq("organization_id", organization.id)
+    .maybeSingle();
+  await supabase.from("billing_events").insert({
+    organization_id: organization.id,
+    subscription_id: subscription?.id,
+    event_type: "checkout_created",
+    status: "pending",
+    amount: plan.monthlyPriceTzs === null ? null : plan.monthlyPriceTzs * parsed.data.seats,
+    currency: "TZS",
+    provider: "snippe",
+    provider_reference: checkout.data.reference,
+    message: "Hosted Snippe payment link created",
+    payload: { checkoutUrl: checkout.data.checkoutUrl, paymentLinkUrl: checkout.data.paymentLinkUrl },
+  });
+  await writeAuditLog({
+    organizationId: organization.id,
+    action: "Snippe checkout created",
+    entityType: "organization_subscription",
+    afterValue: { plan: plan.code, reference: checkout.data.reference },
+  });
+  revalidatePath("/settings/billing");
+  return {
+    ok: true,
+    message: "Snippe checkout created. Redirecting to payment link.",
+    redirectTo: checkout.data.paymentLinkUrl,
+    url: checkout.data.paymentLinkUrl,
+  };
 }

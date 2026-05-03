@@ -31,4 +31,10 @@ describe("supabase schema", () => {
     expect(schema).toContain("create table statutory_rule_versions");
     expect(schema).toContain("Only platform admins can create statutory rule versions");
   });
+
+  it("includes subscription billing storage", () => {
+    expect(schema).toContain("create table organization_subscriptions");
+    expect(schema).toContain("snippe_session_reference");
+    expect(schema).toContain("Owners and accountants can manage subscriptions");
+  });
 });

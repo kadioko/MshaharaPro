@@ -15,6 +15,13 @@ export default function ReportsPage() {
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>{reportTemplateNotes[report].audience}</p>
                 <p>{reportTemplateNotes[report].reviewStatus}</p>
+                <p className="text-xs">Template: {reportTemplateNotes[report].version}</p>
+                {reportTemplateNotes[report].sourceUrl ? (
+                  <p className="text-xs">Reference: <a className="underline" href={reportTemplateNotes[report].sourceUrl} target="_blank" rel="noreferrer">official guidance</a></p>
+                ) : null}
+                {reportTemplateNotes[report].filingNotes?.length ? (
+                  <p className="text-xs">{reportTemplateNotes[report].filingNotes.join(" ")}</p>
+                ) : null}
                 <p className="text-xs">Fields: {reportTemplateNotes[report].requiredFields.join(", ")}</p>
               </div>
               <div className="flex flex-wrap gap-2">

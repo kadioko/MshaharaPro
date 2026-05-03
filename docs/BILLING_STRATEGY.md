@@ -54,18 +54,22 @@ The app includes:
 - Supabase schema patch in `supabase/billing_subscriptions.sql`
 - Server action for recording selected plan, seats, and billing email
 
-This is billing scaffolding, not live payment collection. Stripe checkout should be connected before charging customers.
+This is Snippe billing scaffolding for live hosted checkout sessions. Snippe supports hosted payment sessions and short payment links for mobile money, QR, and card payment collection.
 
-## Recommended Next Payment Step
+## Snippe Integration
 
-Use Stripe subscriptions:
+Implemented:
 
-- `customers`
-- `prices`
-- `subscriptions`
-- Checkout session for new subscriptions
-- Billing portal for plan changes and invoices
-- Webhook handler for subscription status sync
+- `SNIPPE_API_KEY` server-side environment variable
+- `SNIPPE_WEBHOOK_SECRET` for webhook signature verification
+- Hosted checkout session creation from `/settings/billing`
+- Webhook route at `/api/snippe/webhook`
+- Subscription activation on `payment.completed`
+
+Snippe documentation references:
+
+- Sessions: `POST /api/v1/sessions`
+- Webhook signature: `X-Webhook-Signature = HMAC-SHA256(signing_key, "{timestamp}.{raw_body}")`
 
 ## Pilot Approach
 
@@ -75,7 +79,7 @@ Before live payment automation:
 2. Invoice pilot customers manually.
 3. Confirm willingness to pay.
 4. Refine pricing.
-5. Connect Stripe once pricing is validated.
+5. Configure Snippe webhooks once pricing is validated.
 
 ## SQL Patch
 

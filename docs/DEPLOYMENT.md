@@ -14,6 +14,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 SUPABASE_PROJECT_REF=your-project-ref
 SENTRY_DSN=optional-sentry-dsn
+SNIPPE_API_KEY=optional-snippe-api-key
+SNIPPE_WEBHOOK_SECRET=optional-snippe-webhook-secret
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` must never be renamed with `NEXT_PUBLIC_`.
@@ -25,6 +27,7 @@ node scripts/run-supabase-cli.mjs link --project-ref your-project-ref
 node scripts/run-supabase-cli.mjs db query --linked --file supabase/schema.sql
 node scripts/run-supabase-cli.mjs db query --linked --file supabase/rls_employee_portal.sql
 node scripts/run-supabase-cli.mjs db query --linked --file supabase/payslip_unique_constraint.sql
+node scripts/run-supabase-cli.mjs db query --linked --file supabase/billing_subscriptions.sql
 npm run supabase:seed-data
 npm run supabase:verify-rls
 ```
@@ -44,6 +47,7 @@ After deployment:
 - Sign in with a seeded test account.
 - Confirm dashboard data loads from Supabase.
 - Generate a payslip and report to verify Storage writes.
+- Create a Snippe checkout from `/settings/billing` if billing env vars are configured.
 - Revoke any temporary Supabase access tokens used for CLI setup.
 
 ## Monitoring
