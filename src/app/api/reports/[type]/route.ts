@@ -3,7 +3,7 @@ import { writeAuditLog } from "@/lib/supabase/audit";
 import { employees, organizations } from "@/lib/demo-data";
 import { calculatePayrollRun } from "@/lib/payroll/calculator";
 import { initialStatutoryRules } from "@/lib/payroll/rules";
-import { generateReportCsv, generateReportPdf, reportLabels, reportTypes, type ReportType } from "@/lib/reports/generator";
+import { generateReportCsv, generateReportPdf, reportLabels, reportTemplateNotes, reportTypes, type ReportType } from "@/lib/reports/generator";
 import { tryCreateSupabaseServerClient } from "@/lib/supabase/server";
 import { uploadStorageFile } from "@/lib/supabase/storage";
 
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (supabase && upload.ok) {
       const { data: report } = await supabase
         .from("reports")
-        .insert({ organization_id: organization.id, report_type: reportType, format: "pdf", storage_path: storagePath })
+        .insert({ organization_id: organization.id, report_type: reportType, format: "pdf", storage_path: storagePath, template_version: reportTemplateNotes[reportType].version, review_status: "Needs Review" })
         .select("id")
         .single();
       await writeAuditLog({
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (supabase && upload.ok) {
     const { data: report } = await supabase
       .from("reports")
-      .insert({ organization_id: organization.id, report_type: reportType, format: "csv", storage_path: storagePath })
+      .insert({ organization_id: organization.id, report_type: reportType, format: "csv", storage_path: storagePath, template_version: reportTemplateNotes[reportType].version, review_status: "Needs Review" })
       .select("id")
       .single();
     await writeAuditLog({

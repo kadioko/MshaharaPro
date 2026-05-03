@@ -100,3 +100,8 @@ export const payrollVarianceSettingsSchema = z.object({
   netThresholdPercent: z.coerce.number().min(0).max(100),
   employerCostThresholdPercent: z.coerce.number().min(0).max(100),
 });
+
+export const bulkEmployeeRowSchema = employeeSchema.extend({
+  employeeNumber: z.string().min(1),
+  fullName: z.string().min(2),
+});

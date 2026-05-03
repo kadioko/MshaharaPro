@@ -30,6 +30,10 @@ alter table organization_subscriptions add column if not exists snippe_paid_at t
 alter table organization_subscriptions add column if not exists payment_failure_count integer not null default 0;
 alter table organization_subscriptions add column if not exists last_payment_failed_at timestamptz;
 alter table organization_subscriptions add column if not exists payment_failure_reason text;
+alter table reports add column if not exists template_version text;
+alter table reports add column if not exists review_status text not null default 'Needs Review';
+alter table reports add column if not exists reviewed_by uuid references auth.users(id);
+alter table reports add column if not exists reviewed_at timestamptz;
 
 create table if not exists billing_events (
   id uuid primary key default gen_random_uuid(),
@@ -74,6 +78,8 @@ create table if not exists payroll_variance_settings (
 
 create index if not exists payroll_unlock_requests_lookup_idx
   on payroll_unlock_requests (organization_id, payroll_run_id, status, created_at);
+create unique index if not exists employees_organization_employee_number_key
+  on employees (organization_id, employee_number);
 
 alter table organization_subscriptions enable row level security;
 alter table billing_events enable row level security;

@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { adjustments } from "@/lib/demo-data";
+import { hasAppPermission } from "@/lib/auth/session";
 import { calculatePayrollRun } from "@/lib/payroll/calculator";
 import { money, monthLabel } from "@/lib/format";
 import { getAuditLogs, getEmployees, getOrganizations, getPayrollAdjustments, getPayrollRunItems, getPayrollRuns, getPayrollUnlockRequests, getPayrollVarianceSettings, getStatutoryRules } from "@/lib/supabase/data";
@@ -45,23 +46,28 @@ export default async function PayrollDetailPage({ params }: { params: Promise<{ 
   const previousTotals = previousItems.reduce((acc, item) => ({ gross: acc.gross + item.grossPay, net: acc.net + item.netPay, employer: acc.employer + item.totalEmployerCost }), { gross: 0, net: 0, employer: 0 });
   const warnings = items.flatMap((item) => item.warnings.map((warning) => `${runEmployees.find((employee) => employee.id === item.employeeId)?.fullName}: ${warning}`));
   const timeline = auditLogs.filter((log) => log.entityId === run.id || (log.entityType === "payroll_run" && log.organizationId === org.id)).slice(0, 12);
+  const [canCalculate, canSubmit, canApprove] = await Promise.all([
+    hasAppPermission("payroll:calculate", org.id),
+    hasAppPermission("payroll:submit", org.id),
+    hasAppPermission("payroll:approve", org.id),
+  ]);
 
   return (
     <AppShell title={`${org.name} payroll`} description={`${monthLabel(run.month)} · configurable statutory calculation preview`} requiredPermission="payroll:read">
       <div className="mb-4 flex flex-wrap items-start gap-2">
         <StatusBadge status={run.status} />
-        <form action={async () => {
+        {canCalculate ? <form action={async () => {
           "use server";
           await calculateAndPersistPayrollAction(run.id, org.id);
         }}>
           <Button size="sm" variant="outline">Calculate and save</Button>
-        </form>
-        <TransitionButton runId={run.id} organizationId={org.id} status="Pending Approval" label="Submit for approval" icon="send" />
-        <TransitionButton runId={run.id} organizationId={org.id} status="Approved" label="Approve payroll" icon="lock" />
-        <TransitionButton runId={run.id} organizationId={org.id} status="Locked" label="Lock" />
-        <TransitionButton runId={run.id} organizationId={org.id} status="Paid" label="Mark paid" />
-        <TransitionButton runId={run.id} organizationId={org.id} status="Cancelled" label="Cancel" />
-        {run.status === "Locked" || run.status === "Paid" ? (
+        </form> : null}
+        {canSubmit ? <TransitionButton runId={run.id} organizationId={org.id} status="Pending Approval" label="Submit for approval" icon="send" /> : null}
+        {canApprove ? <TransitionButton runId={run.id} organizationId={org.id} status="Approved" label="Approve payroll" icon="lock" /> : null}
+        {canApprove ? <TransitionButton runId={run.id} organizationId={org.id} status="Locked" label="Lock" /> : null}
+        {canApprove ? <TransitionButton runId={run.id} organizationId={org.id} status="Paid" label="Mark paid" /> : null}
+        {canApprove ? <TransitionButton runId={run.id} organizationId={org.id} status="Cancelled" label="Cancel" /> : null}
+        {canSubmit && (run.status === "Locked" || run.status === "Paid") ? (
           <ActionMessageForm action={requestPayrollUnlockAction} label="Request unlock">
             <input name="payrollRunId" type="hidden" value={run.id} />
             <input name="organizationId" type="hidden" value={org.id} />
@@ -111,6 +117,15 @@ export default async function PayrollDetailPage({ params }: { params: Promise<{ 
               </div>
             </div>
           </ActionMessageForm>
+        </CardContent>
+      </Card>
+      <Card className="mb-6">
+        <CardHeader><CardTitle>Approval checklist</CardTitle></CardHeader>
+        <CardContent className="grid gap-3 text-sm md:grid-cols-4">
+          <ChecklistItem label="Payroll calculated" done={persistedItems.length > 0} />
+          <ChecklistItem label="Employee warnings reviewed" done={!warnings.length} />
+          <ChecklistItem label="Variance reviewed" done={!previousRun || previousItems.length > 0} />
+          <ChecklistItem label="Approval note required" done={run.status === "Approved" || run.status === "Locked" || run.status === "Paid"} />
         </CardContent>
       </Card>
       <Card className="mb-6">
@@ -251,15 +266,29 @@ export default async function PayrollDetailPage({ params }: { params: Promise<{ 
 }
 
 function TransitionButton({ runId, organizationId, status, label, icon }: { runId: string; organizationId: string; status: "Pending Approval" | "Approved" | "Locked" | "Paid" | "Cancelled"; label: string; icon?: "send" | "lock" }) {
-  const requiresComment = status !== "Pending Approval";
   return (
     <ActionMessageForm action={transitionPayrollRunWithCommentAction} label={label}>
       <input name="payrollRunId" type="hidden" value={runId} />
       <input name="organizationId" type="hidden" value={organizationId} />
       <input name="status" type="hidden" value={status} />
       {icon === "send" ? <Send className="h-4 w-4 text-muted-foreground" /> : icon === "lock" ? <Lock className="h-4 w-4 text-muted-foreground" /> : null}
-      <Input className="h-8 w-44 text-xs" name="comment" placeholder={requiresComment ? "Required note" : "Optional note"} required={requiresComment} />
+      <select className="h-8 w-44 rounded-md border bg-background px-2 text-xs" name="commentTemplate">
+        <option value="">Comment template</option>
+        <option value="Reviewed employee warnings and statutory calculations.">Reviewed warnings</option>
+        <option value="Variance reviewed against prior payroll and accepted.">Variance accepted</option>
+        <option value="Owner approval received and payroll is ready for lock/payment.">Owner approved</option>
+      </select>
+      <Input className="h-8 w-44 text-xs" name="comment" placeholder={status === "Pending Approval" ? "Optional note" : "Required note"} />
     </ActionMessageForm>
+  );
+}
+
+function ChecklistItem({ label, done }: { label: string; done: boolean }) {
+  return (
+    <div className="rounded-md border p-3">
+      <p className={done ? "font-medium text-emerald-700 dark:text-emerald-300" : "font-medium text-amber-700 dark:text-amber-300"}>{done ? "Ready" : "Needs review"}</p>
+      <p className="mt-1 text-muted-foreground">{label}</p>
+    </div>
   );
 }
 

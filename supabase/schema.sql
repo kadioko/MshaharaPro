@@ -158,6 +158,10 @@ create table reports (
   report_type text not null,
   format text not null,
   storage_path text,
+  template_version text,
+  review_status text not null default 'Needs Review' check (review_status in ('Draft', 'Needs Review', 'Approved Template')),
+  reviewed_by uuid references auth.users(id),
+  reviewed_at timestamptz,
   exported_by uuid references auth.users(id),
   created_at timestamptz not null default now()
 );
@@ -258,6 +262,7 @@ create index on organization_members (organization_id);
 create index on organization_members (user_id);
 create index on employees (organization_id);
 create index on employees (created_at);
+create unique index if not exists employees_organization_employee_number_key on employees (organization_id, employee_number);
 create index on employee_compensation (organization_id, employee_id);
 create index on payroll_runs (organization_id, created_at);
 create index on payroll_run_items (organization_id, payroll_run_id, employee_id);

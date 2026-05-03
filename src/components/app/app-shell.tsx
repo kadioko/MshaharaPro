@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, ClipboardCheck, FileBarChart, LayoutDashboard, ReceiptText, Settings, Users } from "lucide-react";
+import { Building2, CircleHelp, ClipboardCheck, FileBarChart, LayoutDashboard, ReceiptText, Settings, ShieldCheck, Users } from "lucide-react";
 import { BrandLogo } from "@/components/app/brand-logo";
 import { LogoutButton } from "@/components/app/logout-button";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ const nav = [
   { href: "/compliance", label: "Compliance", icon: ClipboardCheck, permission: "reports:export" },
   { href: "/reports", label: "Reports", icon: FileBarChart, permission: "reports:export" },
   { href: "/settings", label: "Settings", icon: Settings, permission: "company:update" },
+  { href: "/admin", label: "Admin", icon: ShieldCheck, permission: "admin:read" },
+  { href: "/help", label: "Help", icon: CircleHelp, permission: "dashboard:read" },
 ];
 
 export async function AppShell({

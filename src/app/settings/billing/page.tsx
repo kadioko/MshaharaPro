@@ -19,6 +19,17 @@ export default async function BillingPage() {
 
   return (
     <AppShell title="Billing" description="Plan selection, billing contact, and launch-ready subscription setup." requiredPermission="company:update">
+      {subscription.status === "past_due" ? (
+        <Card className="mb-6 border-destructive/40 bg-destructive/10">
+          <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="font-semibold text-destructive">Subscription payment needs attention</p>
+              <p className="text-sm text-muted-foreground">Create a fresh Snippe checkout or reopen the latest payment link to retry collection.</p>
+            </div>
+            {subscription.snippePaymentLinkUrl ? <Button asChild><a href={subscription.snippePaymentLinkUrl} target="_blank" rel="noreferrer">Retry payment</a></Button> : null}
+          </CardContent>
+        </Card>
+      ) : null}
       <div className="mb-6 grid gap-4 md:grid-cols-4">
         {billingPlans.map((plan) => (
           <Card key={plan.code} className={subscription.planCode === plan.code ? "border-primary" : ""}>
@@ -68,6 +79,7 @@ export default async function BillingPage() {
                 <a href={subscription.snippePaymentLinkUrl} target="_blank" rel="noreferrer">Open latest Snippe payment link</a>
               </Button>
             ) : null}
+            <Button variant="outline" className="w-full" disabled>Invoice/receipt download coming after Snippe receipt mapping</Button>
           </CardContent>
         </Card>
 

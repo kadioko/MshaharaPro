@@ -127,6 +127,19 @@ export type BillingEvent = {
   createdAt: string;
 };
 
+export type ReportExport = {
+  id: string;
+  organizationId: string;
+  payrollRunId?: string;
+  reportType: string;
+  format: string;
+  storagePath?: string;
+  templateVersion?: string;
+  reviewStatus: "Draft" | "Needs Review" | "Approved Template";
+  reviewedAt?: string;
+  createdAt: string;
+};
+
 export type PayrollLineItem = {
   employeeId: string;
   basicSalary: number;

@@ -1,7 +1,7 @@
 import { auditLogs, employees, organizations, payrollRuns } from "@/lib/demo-data";
 import { getCurrentSession } from "@/lib/auth/session";
 import { initialStatutoryRules } from "@/lib/payroll/rules";
-import type { BillingEvent, PayrollLineItem, PayrollUnlockRequest, PayrollVarianceSettings, StatutoryRule } from "@/lib/types";
+import type { BillingEvent, PayrollLineItem, PayrollUnlockRequest, PayrollVarianceSettings, ReportExport, StatutoryRule } from "@/lib/types";
 import { getBillingPlan } from "@/lib/billing/plans";
 import { tryCreateSupabaseServerClient } from "./server";
 
@@ -380,4 +380,28 @@ export async function getPayrollVarianceSettings(organizationId: string): Promis
     netThresholdPercent: Number(data.net_threshold_percent ?? 10),
     employerCostThresholdPercent: Number(data.employer_cost_threshold_percent ?? 10),
   };
+}
+
+export async function getReportExports(organizationId: string): Promise<ReportExport[]> {
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("reports")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .order("created_at", { ascending: false })
+    .limit(30);
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: row.id,
+    organizationId: row.organization_id,
+    payrollRunId: row.payroll_run_id ?? undefined,
+    reportType: row.report_type,
+    format: row.format,
+    storagePath: row.storage_path ?? undefined,
+    templateVersion: row.template_version ?? undefined,
+    reviewStatus: row.review_status ?? "Needs Review",
+    reviewedAt: row.reviewed_at ?? undefined,
+    createdAt: row.created_at,
+  }));
 }

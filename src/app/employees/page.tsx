@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createEmployeeAction } from "@/app/actions";
 import { ActionForm } from "@/components/app/action-form";
 import { AppShell } from "@/components/app/app-shell";
+import { EmployeeBulkImport } from "@/components/app/employee-bulk-import";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,14 +13,16 @@ import { getEmployees, getOrganizations } from "@/lib/supabase/data";
 
 export default async function EmployeesPage() {
   const [employees, organizations] = await Promise.all([getEmployees(), getOrganizations()]);
+  const organizationId = organizations[0]?.id;
+  const canWriteEmployees = organizationId ? await hasAppPermission("employee:write", organizationId) : false;
 
   return (
     <AppShell title="Employees" description="Personal records, compensation, deductions, loans, payslips, documents, and audit history." requiredPermission="employee:read">
-      <Card className="mb-6">
+      {canWriteEmployees && organizationId ? <Card className="mb-6">
         <CardHeader><CardTitle>Quick add employee</CardTitle></CardHeader>
         <CardContent>
           <ActionForm action={createEmployeeAction} className="grid gap-4 md:grid-cols-4" submitClassName="md:col-span-4" submitLabel="Save employee">
-            <input name="organizationId" type="hidden" value={organizations[0].id} />
+            <input name="organizationId" type="hidden" value={organizationId} />
             <div className="space-y-2"><Label htmlFor="employeeNumber">Employee no.</Label><Input id="employeeNumber" name="employeeNumber" required /></div>
             <div className="space-y-2"><Label htmlFor="fullName">Full name</Label><Input id="fullName" name="fullName" required /></div>
             <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" required /></div>
@@ -32,7 +35,15 @@ export default async function EmployeesPage() {
             <input name="allowances" type="hidden" value="0" />
           </ActionForm>
         </CardContent>
-      </Card>
+      </Card> : null}
+      {canWriteEmployees && organizationId ? (
+        <Card className="mb-6">
+          <CardHeader><CardTitle>Bulk import employees</CardTitle></CardHeader>
+          <CardContent>
+            <EmployeeBulkImport organizationId={organizationId} sampleCsv={employeeImportSampleCsv()} />
+          </CardContent>
+        </Card>
+      ) : null}
       <Card>
         <CardHeader><CardTitle>Employee register</CardTitle></CardHeader>
         <CardContent>
@@ -56,3 +67,5 @@ export default async function EmployeesPage() {
     </AppShell>
   );
 }
+import { hasAppPermission } from "@/lib/auth/session";
+import { employeeImportSampleCsv } from "@/lib/employees/bulk-import";

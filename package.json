@@ -13,7 +13,8 @@
     "supabase:seed-users": "tsx scripts/seed-supabase-users.ts",
     "supabase:seed-data": "tsx scripts/seed-supabase-data.ts",
     "supabase:verify-rls": "tsx scripts/verify-supabase-rls.ts",
-    "product:audit": "tsx scripts/product-gap-audit.ts"
+    "product:audit": "tsx scripts/product-gap-audit.ts",
+    "smoke:prod": "tsx scripts/production-smoke.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

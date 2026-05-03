@@ -25,6 +25,7 @@ import {
 } from "@/lib/validation/schemas";
 import { getBillingPlan } from "@/lib/billing/plans";
 import { createSnippeCheckoutSession } from "@/lib/billing/snippe";
+import { parseEmployeeCsv } from "@/lib/employees/bulk-import";
 import type { PayrollStatus } from "@/lib/types";
 
 export type ActionState = {
@@ -368,6 +369,64 @@ export async function createEmployeeAction(_prevState: ActionState, formData: Fo
   return { ok: true, message: "Employee saved." };
 }
 
+export async function bulkImportEmployeesAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const organizationId = String(formData.get("organizationId") ?? "");
+  const csv = String(formData.get("csv") ?? "");
+  if (!organizationId || !csv.trim()) return { ok: false, message: "Choose a CSV file before importing." };
+  const denied = await forbidden("employee:write", organizationId);
+  if (denied) return denied;
+  const preview = parseEmployeeCsv(csv);
+  if (!preview.length) return { ok: false, message: "CSV has no employee rows." };
+  const invalid = preview.filter((row) => row.errors.length);
+  if (invalid.length) return { ok: false, message: `${invalid.length} row(s) need fixes before import.` };
+  const supabase = await tryCreateSupabaseServerClient();
+  if (!supabase) return { ok: true, message: `Demo import validated ${preview.length} employees.` };
+
+  let imported = 0;
+  for (const row of preview) {
+    const values = row.values;
+    const parsedEmployee = employeeSchema.parse({
+      employeeNumber: values.employeeNumber,
+      fullName: values.fullName,
+      email: values.email,
+      phone: values.phone,
+      nida: values.nida || undefined,
+      tin: values.tin || undefined,
+      nssfNumber: values.nssfNumber || undefined,
+      jobTitle: values.jobTitle,
+      department: values.department,
+      employmentType: values.employmentType || "permanent",
+      startDate: values.startDate,
+      basicSalary: values.basicSalary,
+      allowances: values.allowances || 0,
+      bankName: values.bankName || undefined,
+      bankAccountNumber: values.bankAccountNumber || undefined,
+      mobileMoneyNumber: values.mobileMoneyNumber || undefined,
+      active: true,
+    });
+    const rows = employeeToRows({ ...parsedEmployee, id: "new", organizationId });
+    const { data: employee, error } = await supabase
+      .from("employees")
+      .upsert(rows.employee, { onConflict: "organization_id,employee_number" })
+      .select("id")
+      .single();
+    if (error) return { ok: false, message: `Row ${row.rowNumber}: ${error.message}` };
+    const { error: compensationError } = await supabase
+      .from("employee_compensation")
+      .insert({ ...rows.compensation, employee_id: employee.id });
+    if (compensationError) return { ok: false, message: `Row ${row.rowNumber}: ${compensationError.message}` };
+    imported += 1;
+  }
+  await writeAuditLog({
+    organizationId,
+    action: "Employee bulk import",
+    entityType: "employee",
+    afterValue: { imported, warnings: preview.reduce((count, row) => count + row.warnings.length, 0) },
+  });
+  revalidatePath("/employees");
+  return { ok: true, message: `Imported ${imported} employees.` };
+}
+
 export async function updateEmployeeAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const employeeId = String(formData.get("employeeId") ?? "");
   const organizationId = String(formData.get("organizationId") ?? "");
@@ -555,7 +614,8 @@ export async function transitionPayrollRunWithCommentAction(_prevState: ActionSt
   const payrollRunId = String(formData.get("payrollRunId") ?? "");
   const organizationId = String(formData.get("organizationId") ?? "");
   const status = String(formData.get("status") ?? "") as PayrollTransitionStatus;
-  const comment = String(formData.get("comment") ?? "").trim();
+  const template = String(formData.get("commentTemplate") ?? "").trim();
+  const comment = [template, String(formData.get("comment") ?? "").trim()].filter(Boolean).join(" ");
   if (!payrollRunId || !organizationId || !status) return { ok: false, message: "Missing payroll transition details." };
   return transitionPayrollRunAction(payrollRunId, organizationId, status, comment);
 }
@@ -837,6 +897,33 @@ export async function transitionPayrollRunAction(
   if (requiresCalculatedPayroll && !itemCount) {
     return { ok: false, message: "Calculate and save payroll before this workflow step." };
   }
+  if (status === "Approved" || status === "Locked" || status === "Paid") {
+    const currentMonth = String(beforeValue.payroll_month).slice(0, 10);
+    const { data: previousRun } = await supabase
+      .from("payroll_runs")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .lt("payroll_month", currentMonth)
+      .order("payroll_month", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (previousRun?.id) {
+      const [{ data: currentItems }, { data: previousItems }, { data: varianceSettings }] = await Promise.all([
+        supabase.from("payroll_run_items").select("gross_pay, net_pay, total_employer_cost").eq("payroll_run_id", payrollRunId),
+        supabase.from("payroll_run_items").select("gross_pay, net_pay, total_employer_cost").eq("payroll_run_id", previousRun.id),
+        supabase.from("payroll_variance_settings").select("*").eq("organization_id", organizationId).maybeSingle(),
+      ]);
+      const currentTotals = sumPayrollVarianceItems(currentItems ?? []);
+      const previousTotals = sumPayrollVarianceItems(previousItems ?? []);
+      const thresholdBreached =
+        exceedsThreshold(currentTotals.gross, previousTotals.gross, Number(varianceSettings?.gross_threshold_percent ?? 10)) ||
+        exceedsThreshold(currentTotals.net, previousTotals.net, Number(varianceSettings?.net_threshold_percent ?? 10)) ||
+        exceedsThreshold(currentTotals.employer, previousTotals.employer, Number(varianceSettings?.employer_cost_threshold_percent ?? 10));
+      if (thresholdBreached && comment.trim().length < 20) {
+        return { ok: false, message: "Variance exceeds the configured threshold. Add a detailed approval note before continuing." };
+      }
+    }
+  }
 
   const timestampColumn =
     status === "Pending Approval" ? "submitted_at" : status === "Approved" ? "approved_at" : status === "Locked" ? "locked_at" : status === "Paid" ? "paid_at" : null;
@@ -856,6 +943,22 @@ export async function transitionPayrollRunAction(
   revalidatePath("/payroll");
   revalidatePath(`/payroll/${payrollRunId}`);
   return { ok: true, message: `Payroll marked ${status}.` };
+}
+
+function sumPayrollVarianceItems(items: { gross_pay: unknown; net_pay: unknown; total_employer_cost: unknown }[]) {
+  return items.reduce(
+    (acc, item) => ({
+      gross: acc.gross + Number(item.gross_pay ?? 0),
+      net: acc.net + Number(item.net_pay ?? 0),
+      employer: acc.employer + Number(item.total_employer_cost ?? 0),
+    }),
+    { gross: 0, net: 0, employer: 0 },
+  );
+}
+
+function exceedsThreshold(current: number, previous: number, threshold: number) {
+  if (!previous) return false;
+  return Math.abs(((current - previous) / previous) * 100) > threshold;
 }
 
 export async function savePayrollVarianceSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
