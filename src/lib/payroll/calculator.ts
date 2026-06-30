@@ -109,6 +109,6 @@ function missingEmployeeFields(employee: Employee) {
     !employee.tin ? "Missing TIN" : null,
     !employee.nssfNumber ? "Missing NSSF number" : null,
     !employee.nida ? "Missing NIDA" : null,
-    !employee.bankName || !employee.bankAccountNumber ? "Missing bank details" : null,
+    !employee.mobileMoneyNumber && (!employee.bankName || !employee.bankAccountNumber) ? "Missing bank or mobile money details" : null,
   ].filter(Boolean) as string[];
 }

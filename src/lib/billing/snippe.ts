@@ -28,7 +28,8 @@ export async function createSnippeCheckoutSession(input: CreateSnippeSessionInpu
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3001";
-  const amount = input.plan.monthlyPriceTzs;
+  const unitPrice = input.plan.monthlyPriceTzs;
+  const amount = unitPrice * input.seats;
   const body = {
     amount,
     currency: "TZS",
@@ -52,8 +53,8 @@ export async function createSnippeCheckoutSession(input: CreateSnippeSessionInpu
         id: input.plan.code,
         name: `MshaharaPro ${input.plan.name}`,
         description: input.plan.bestFor,
-        quantity: 1,
-        unit_price: amount,
+        quantity: input.seats,
+        unit_price: unitPrice,
         category: "SaaS subscription",
       },
     ],

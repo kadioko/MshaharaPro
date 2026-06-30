@@ -96,8 +96,9 @@ export function generateReportCsv(
   organization: Organization,
   employees: Employee[],
   items: PayrollLineItem[],
+  payrollMonth = "April 2026",
 ) {
-  const rows = buildRows(type, organization, employees, items);
+  const rows = buildRows(type, organization, employees, items, payrollMonth);
   return rows.map((row) => row.map(csvCell).join(",")).join("\n");
 }
 
@@ -106,6 +107,7 @@ export async function generateReportPdf(
   organization: Organization,
   employees: Employee[],
   items: PayrollLineItem[],
+  payrollMonth = "April 2026",
 ) {
   const doc = new PDFDocument({ size: "A4", margin: 48 });
   const chunks: Buffer[] = [];
@@ -115,13 +117,13 @@ export async function generateReportPdf(
   doc.fontSize(18).text(`MshaharaPro ${reportLabels[type]}`, { align: "center" });
   doc.moveDown();
   doc.fontSize(11).text(organization.name);
-  doc.text("Payroll month: April 2026");
+  doc.text(`Payroll month: ${payrollMonth}`);
   doc.text(`Template: ${reportTemplateNotes[type].version}`);
   doc.text(`Review status: ${reportTemplateNotes[type].reviewStatus}`);
   if (reportTemplateNotes[type].sourceUrl) doc.text(`Reference: ${reportTemplateNotes[type].sourceUrl}`);
   doc.moveDown();
 
-  const [headers, ...rows] = buildRows(type, organization, employees, items);
+  const [headers, ...rows] = buildRows(type, organization, employees, items, payrollMonth);
   doc.fontSize(10).text(headers.join(" | "));
   doc.moveDown(0.5);
   rows.slice(0, 28).forEach((row) => doc.text(row.join(" | ")));
@@ -131,7 +133,7 @@ export async function generateReportPdf(
   return done;
 }
 
-function buildRows(type: ReportType, organization: Organization, employees: Employee[], items: PayrollLineItem[]) {
+function buildRows(type: ReportType, organization: Organization, employees: Employee[], items: PayrollLineItem[], payrollMonth: string) {
   const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
   const base = items.map((item) => {
     const employee = employeeById.get(item.employeeId);
@@ -167,7 +169,7 @@ function buildRows(type: ReportType, organization: Organization, employees: Empl
         item.nssfEmployee,
         item.grossPay - item.nssfEmployee,
         item.paye,
-        "April 2026",
+        payrollMonth,
         "Accountant review required",
       ]),
     ];

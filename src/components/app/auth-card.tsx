@@ -20,6 +20,7 @@ const schema = z.object({
 export function AuthCard({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const showDemoAccounts = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_ENABLE_DEMO_ACCOUNTS === "true";
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: { email: "", password: "" },
@@ -47,9 +48,9 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
       return;
     }
 
-    const account = authenticateDemoUser(values.email, values.password);
+    const account = showDemoAccounts ? authenticateDemoUser(values.email, values.password) : null;
     if (!account) {
-      setError(`${supabaseResult.message} Or use one of the demo emails below with the test password.`);
+      setError(showDemoAccounts ? `${supabaseResult.message} Or use one of the demo emails below with the test password.` : supabaseResult.message);
       return;
     }
 
@@ -90,7 +91,7 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
           {error ? <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p> : null}
           <Button className="w-full" type="submit">{mode === "login" ? "Login" : "Sign up"}</Button>
         </form>
-        {mode === "login" ? (
+        {mode === "login" && showDemoAccounts ? (
           <div className="mt-5 space-y-3">
             <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
               Test password for all demo accounts: <span className="font-mono font-medium text-foreground">{DEMO_PASSWORD}</span>

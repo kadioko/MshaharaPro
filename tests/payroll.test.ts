@@ -24,6 +24,24 @@ describe("payroll calculation engine", () => {
     expect(line.netPay).toBeLessThan(line.grossPay);
     expect(line.totalEmployerCost).toBeGreaterThan(line.grossPay);
   });
+
+  it("includes manual earnings and deductions in payroll line items", () => {
+    const org = organizations[0];
+    const employee = employees[0];
+    const [line] = calculatePayrollRun(
+      org,
+      [employee],
+      [
+        { id: "adj-earning", employeeId: employee.id, type: "earning", label: "Overtime", amount: 50_000, reason: "Approved overtime" },
+        { id: "adj-deduction", employeeId: employee.id, type: "deduction", label: "Advance", amount: 25_000, reason: "Signed advance" },
+      ],
+      initialStatutoryRules,
+    );
+
+    expect(line.grossPay).toBe(employee.basicSalary + employee.allowances + 50_000);
+    expect(line.otherDeductions).toBe(25_000);
+    expect(line.netPay).toBeLessThan(line.grossPay - 25_000);
+  });
 });
 
 describe("role permission helpers", () => {

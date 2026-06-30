@@ -53,6 +53,8 @@ The app includes:
 - Billing setup page at `/settings/billing`
 - Supabase schema patch in `supabase/billing_subscriptions.sql`
 - Server action for recording selected plan, seats, and billing email
+- Billing history and failed-payment records in the billing schema patch
+- Subscription status banners and retry-link placeholders for `past_due` accounts
 
 This is Snippe billing scaffolding for live hosted checkout sessions. Snippe supports hosted payment sessions and short payment links for mobile money, QR, and card payment collection.
 
@@ -65,6 +67,8 @@ Implemented:
 - Hosted checkout session creation from `/settings/billing`
 - Webhook route at `/api/snippe/webhook`
 - Subscription activation on `payment.completed`
+- Payment failure handling on Snippe webhook events
+- Seat-aware checkout quantity based on plan limits and selected user count
 
 Snippe documentation references:
 
@@ -80,6 +84,17 @@ Before live payment automation:
 3. Confirm willingness to pay.
 4. Refine pricing.
 5. Configure Snippe webhooks once pricing is validated.
+
+## Production Validation
+
+Before charging customers:
+
+1. Apply `supabase/billing_subscriptions.sql` to live Supabase.
+2. Set `SNIPPE_API_KEY` and `SNIPPE_WEBHOOK_SECRET` in Vercel.
+3. Create one test checkout from `/settings/billing`.
+4. Confirm the webhook marks the subscription `active`.
+5. Trigger or simulate a failed payment and confirm the customer sees the retry state.
+6. Confirm billing history rows are visible to owners/admins only.
 
 ## SQL Patch
 

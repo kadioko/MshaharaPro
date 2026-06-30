@@ -7,11 +7,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { reportLabels, reportTemplateNotes, reportTypes } from "@/lib/reports/generator";
 import { getOrganizations, getReportExports } from "@/lib/supabase/data";
 
-export default async function ReportsPage() {
-  const [organization] = await getOrganizations();
-  const exports = await getReportExports(organization.id);
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ organizationId?: string }> }) {
+  const { organizationId } = await searchParams;
+  const organizations = await getOrganizations();
+  const selectedOrganization = organizations.find((item) => item.id === organizationId) ?? organizations[0];
+  const exports = selectedOrganization ? await getReportExports(selectedOrganization.id) : [];
   return (
     <AppShell title="Reports" description="Export payroll, statutory, payment, department, and loan reports as CSV or PDF summaries." requiredPermission="reports:export">
+      {!selectedOrganization ? (
+        <Card>
+          <CardContent className="p-5 text-sm text-muted-foreground">No organization is available for report exports.</CardContent>
+        </Card>
+      ) : null}
+      {organizations.length > 1 ? (
+        <Card className="mb-6">
+          <CardHeader><CardTitle>Report company</CardTitle></CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {organizations.map((item) => (
+              <Button key={item.id} asChild size="sm" variant={item.id === selectedOrganization?.id ? "default" : "outline"}>
+                <a href={`/reports?organizationId=${item.id}`}>{item.name}</a>
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {reportTypes.map((report) => (
           <Card key={report}>
@@ -30,9 +49,9 @@ export default async function ReportsPage() {
                 <p className="text-xs">Fields: {reportTemplateNotes[report].requiredFields.join(", ")}</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button asChild size="sm" variant="outline"><a href={`/api/reports/${report}?format=csv`}><Download className="h-4 w-4" /> CSV</a></Button>
-                <Button asChild size="sm" variant="outline"><a href={`/api/reports/${report}?format=csv&excel=1`}><Download className="h-4 w-4" /> Excel CSV</a></Button>
-                <Button asChild size="sm"><a href={`/api/reports/${report}?format=pdf`}><Download className="h-4 w-4" /> PDF</a></Button>
+                <Button asChild size="sm" variant="outline" disabled={!selectedOrganization}><a href={`/api/reports/${report}?format=csv&organizationId=${selectedOrganization?.id ?? ""}`}><Download className="h-4 w-4" /> CSV</a></Button>
+                <Button asChild size="sm" variant="outline" disabled={!selectedOrganization}><a href={`/api/reports/${report}?format=csv&excel=1&organizationId=${selectedOrganization?.id ?? ""}`}><Download className="h-4 w-4" /> Excel CSV</a></Button>
+                <Button asChild size="sm" disabled={!selectedOrganization}><a href={`/api/reports/${report}?format=pdf&organizationId=${selectedOrganization?.id ?? ""}`}><Download className="h-4 w-4" /> PDF</a></Button>
               </div>
             </CardContent>
           </Card>
@@ -50,7 +69,7 @@ export default async function ReportsPage() {
               </div>
               <ActionMessageForm action={reviewReportExportAction} label="Save review">
                 <input name="reportId" type="hidden" value={item.id} />
-                <input name="organizationId" type="hidden" value={organization.id} />
+                <input name="organizationId" type="hidden" value={selectedOrganization?.id ?? ""} />
                 <select className="h-8 rounded-md border bg-background px-2 text-xs" name="reviewStatus" defaultValue={item.reviewStatus}>
                   <option value="Draft">Draft</option>
                   <option value="Needs Review">Needs Review</option>

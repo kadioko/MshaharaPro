@@ -2,14 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { writeAuditLog } from "@/lib/supabase/audit";
 import { requireAppPermission } from "@/lib/auth/session";
 import { calculatePayrollRun } from "@/lib/payroll/calculator";
 import { employeeToRows, organizationToRow, statutoryRuleToRow } from "@/lib/supabase/mappers";
 import { createSignedStorageUrl, uploadStorageFile } from "@/lib/supabase/storage";
-import { getEmployees, getOrganizations, getStatutoryRules } from "@/lib/supabase/data";
-import { tryCreateSupabaseServerClient } from "@/lib/supabase/server";
+import { getEmployees, getOrganizations, getPayrollAdjustments, getStatutoryRules } from "@/lib/supabase/data";
+import { tryCreateSupabaseServerClient, tryCreateSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import {
   authSchema,
   companySchema,
@@ -67,6 +68,21 @@ async function forbidden(permission: string, organizationId?: string): Promise<A
   return allowed ? null : { ok: false, message: "You do not have permission to perform this action." };
 }
 
+async function assertDraftPayrollRun(supabase: SupabaseClient, payrollRunId: string, organizationId: string): Promise<ActionState | null> {
+  const { data: run, error } = await supabase
+    .from("payroll_runs")
+    .select("status")
+    .eq("id", payrollRunId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (error) return { ok: false, message: error.message };
+  if (!run) return { ok: false, message: "Payroll run not found." };
+  if (run.status !== "Draft") {
+    return { ok: false, message: "Payroll adjustments and recalculation are only allowed while the run is Draft." };
+  }
+  return null;
+}
+
 export async function signInWithPassword(values: z.infer<typeof authSchema>): Promise<ActionState> {
   const parsed = authSchema.safeParse(values);
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid login." };
@@ -121,7 +137,9 @@ export async function createOrganizationAction(_prevState: ActionState, formData
     .single();
   if (error) return { ok: false, message: error.message };
 
-  const { error: memberError } = await supabase.from("organization_members").insert({
+  const serviceSupabase = tryCreateSupabaseServiceRoleClient();
+  const membershipClient = serviceSupabase ?? supabase;
+  const { error: memberError } = await membershipClient.from("organization_members").insert({
     organization_id: organization.id,
     user_id: user.id,
     role: "company_owner",
@@ -159,14 +177,16 @@ export async function acceptInviteAction(_prevState: ActionState, formData: Form
   if (invite.accepted_at) return { ok: false, message: "Invite has already been accepted." };
   if (new Date(invite.expires_at) < new Date()) return { ok: false, message: "Invite has expired." };
 
-  const { error: memberError } = await supabase.from("organization_members").insert({
+  const serviceSupabase = tryCreateSupabaseServiceRoleClient();
+  const membershipClient = serviceSupabase ?? supabase;
+  const { error: memberError } = await membershipClient.from("organization_members").insert({
     organization_id: invite.organization_id,
     user_id: user.id,
     role: invite.role,
   });
   if (memberError) return { ok: false, message: memberError.message };
 
-  await supabase.from("invites").update({ accepted_at: new Date().toISOString() }).eq("id", invite.id);
+  await membershipClient.from("invites").update({ accepted_at: new Date().toISOString() }).eq("id", invite.id);
   await writeAuditLog({
     organizationId: invite.organization_id,
     action: "Invite accepted",
@@ -229,6 +249,10 @@ export async function addPayrollAdjustmentAction(_prevState: ActionState, formDa
   if (denied) return denied;
   const supabase = await tryCreateSupabaseServerClient();
   if (!supabase) return { ok: true, message: "Demo adjustment saved for preview." };
+  if (parsed.data.payrollRunId) {
+    const editable = await assertDraftPayrollRun(supabase, parsed.data.payrollRunId, parsed.data.organizationId);
+    if (editable) return editable;
+  }
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -270,6 +294,10 @@ export async function updatePayrollAdjustmentAction(_prevState: ActionState, for
   if (denied) return denied;
   const supabase = await tryCreateSupabaseServerClient();
   if (!supabase) return { ok: true, message: "Demo adjustment updated for preview." };
+  if (parsed.data.payrollRunId) {
+    const editable = await assertDraftPayrollRun(supabase, parsed.data.payrollRunId, parsed.data.organizationId);
+    if (editable) return editable;
+  }
 
   const { data: beforeValue } = await supabase.from("payroll_adjustments").select("*").eq("id", adjustmentId).single();
   const { error } = await supabase.from("payroll_adjustments").update({
@@ -540,6 +568,10 @@ export async function deletePayrollAdjustmentAction(adjustmentId: string, organi
   if (denied) return denied;
   const supabase = await tryCreateSupabaseServerClient();
   if (!supabase) return { ok: true, message: "Demo adjustment deleted for preview." };
+  if (payrollRunId) {
+    const editable = await assertDraftPayrollRun(supabase, payrollRunId, organizationId);
+    if (editable) return editable;
+  }
   const { data: beforeValue } = await supabase.from("payroll_adjustments").select("*").eq("id", adjustmentId).single();
   const { error } = await supabase.from("payroll_adjustments").delete().eq("id", adjustmentId);
   if (error) return { ok: false, message: error.message };
@@ -815,13 +847,21 @@ export async function calculateAndPersistPayrollAction(
   const supabase = await tryCreateSupabaseServerClient();
   if (!supabase) return { ok: true, message: "Demo payroll calculated for preview." };
 
-  const [organizations, employees, rules] = await Promise.all([getOrganizations(), getEmployees(), getStatutoryRules()]);
+  const editable = await assertDraftPayrollRun(supabase, payrollRunId, organizationId);
+  if (editable) return editable;
+
+  const [organizations, employees, rules, payrollAdjustments] = await Promise.all([
+    getOrganizations(),
+    getEmployees(),
+    getStatutoryRules(),
+    getPayrollAdjustments(payrollRunId),
+  ]);
   const organization = organizations.find((item) => item.id === organizationId);
   if (!organization) return { ok: false, message: "Organization not found." };
   const items = calculatePayrollRun(
     organization,
     employees.filter((employee) => employee.organizationId === organizationId),
-    [],
+    payrollAdjustments,
     rules,
   );
   await supabase.from("payroll_run_items").delete().eq("payroll_run_id", payrollRunId);

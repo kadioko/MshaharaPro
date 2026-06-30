@@ -13,12 +13,17 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 SUPABASE_PROJECT_REF=your-project-ref
+CRON_SECRET=random-long-secret-for-vercel-cron
+ENABLE_DEMO_ACCOUNTS=false
+NEXT_PUBLIC_ENABLE_DEMO_ACCOUNTS=false
 SENTRY_DSN=optional-sentry-dsn
 SNIPPE_API_KEY=optional-snippe-api-key
 SNIPPE_WEBHOOK_SECRET=optional-snippe-webhook-secret
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` must never be renamed with `NEXT_PUBLIC_`.
+`CRON_SECRET` should be a random private value. Vercel Cron sends it as `Authorization: Bearer <CRON_SECRET>` when invoking scheduled routes.
+Keep demo accounts disabled in production unless you are deploying a dedicated sales-demo environment. The server checks `ENABLE_DEMO_ACCOUNTS`; the login UI checks `NEXT_PUBLIC_ENABLE_DEMO_ACCOUNTS`.
 
 ## Supabase Setup
 
@@ -28,6 +33,7 @@ node scripts/run-supabase-cli.mjs db query --linked --file supabase/schema.sql
 node scripts/run-supabase-cli.mjs db query --linked --file supabase/rls_employee_portal.sql
 node scripts/run-supabase-cli.mjs db query --linked --file supabase/payslip_unique_constraint.sql
 node scripts/run-supabase-cli.mjs db query --linked --file supabase/billing_subscriptions.sql
+node scripts/run-supabase-cli.mjs db query --linked --file supabase/security_hardening.sql
 npm run supabase:seed-data
 npm run supabase:verify-rls
 ```
@@ -49,6 +55,23 @@ After deployment:
 - Generate a payslip and report to verify Storage writes.
 - Create a Snippe checkout from `/settings/billing` if billing env vars are configured.
 - Revoke any temporary Supabase access tokens used for CLI setup.
+
+## Supabase Free Plan Keep-Alive
+
+Supabase Free projects can be paused after one week of inactivity. MshaharaPro includes a tiny authenticated Vercel Cron heartbeat:
+
+- Route: `/api/cron/supabase-keepalive`
+- Schedule: `0 6 * * *` in `vercel.json`
+- Behavior: performs a lightweight `organizations` count through Supabase
+- Security: requires `CRON_SECRET`
+
+Set `CRON_SECRET` in Vercel Production env vars, then redeploy. You can test manually with:
+
+```bash
+curl -H "Authorization: Bearer your-cron-secret" https://your-domain.com/api/cron/supabase-keepalive
+```
+
+Check Vercel Cron logs after deployment to confirm daily `200` responses.
 
 ## Monitoring
 

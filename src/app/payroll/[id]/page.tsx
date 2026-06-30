@@ -176,7 +176,7 @@ export default async function PayrollDetailPage({ params }: { params: Promise<{ 
           </Table>
         </CardContent>
       </Card>
-      <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+      {canCalculate ? <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <Card>
           <CardHeader><CardTitle>Add adjustment</CardTitle></CardHeader>
           <CardContent>
@@ -243,7 +243,7 @@ export default async function PayrollDetailPage({ params }: { params: Promise<{ 
             </Table>
           </CardContent>
         </Card>
-      </div>
+      </div> : null}
       <Card className="mt-6">
         <CardHeader><CardTitle>Payroll timeline</CardTitle></CardHeader>
         <CardContent>

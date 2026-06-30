@@ -14,6 +14,8 @@ export type AppSession = {
   source: "demo" | "supabase";
 };
 
+const rolePriority: UserRole[] = ["platform_admin", "accountant", "company_owner", "payroll_manager", "employee"];
+
 export async function getCurrentSession(): Promise<AppSession | null> {
   const supabase = await tryCreateSupabaseServerClient();
   if (supabase) {
@@ -21,11 +23,20 @@ export async function getCurrentSession(): Promise<AppSession | null> {
       data: { user },
     } = await supabase.auth.getUser();
     if (user?.email) {
+      const { data: memberships } = await supabase
+        .from("organization_members")
+        .select("role, organizations(name)")
+        .eq("user_id", user.id);
+      const role = pickHighestRole(memberships?.map((membership) => membership.role as UserRole) ?? []) ?? "company_owner";
+      const organizationRow = memberships?.[0]?.organizations as { name?: string } | { name?: string }[] | null | undefined;
+      const organization = organizationRow && !Array.isArray(organizationRow)
+        ? organizationRow.name
+        : user.user_metadata?.organization;
       return {
         email: user.email,
         name: user.user_metadata?.name ?? user.email,
-        role: (user.user_metadata?.role as UserRole | undefined) ?? "company_owner",
-        organization: user.user_metadata?.organization,
+        role,
+        organization,
         source: "supabase",
       };
     }
@@ -57,12 +68,20 @@ export async function hasAppPermission(permission: string, organizationId?: stri
   }
 
   const supabase = await tryCreateSupabaseServerClient();
-  if (!supabase || !organizationId) return can(session.role, permission);
+  if (!supabase) return false;
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return false;
+
+  if (!organizationId) {
+    const { data: memberships } = await supabase
+      .from("organization_members")
+      .select("role")
+      .eq("user_id", user.id);
+    return (memberships ?? []).some((membership) => can(membership.role as AppSession["role"], permission));
+  }
 
   const { data: membership } = await supabase
     .from("organization_members")
@@ -70,10 +89,14 @@ export async function hasAppPermission(permission: string, organizationId?: stri
     .eq("organization_id", organizationId)
     .eq("user_id", user.id)
     .maybeSingle();
-
-  return can((membership?.role as AppSession["role"] | undefined) ?? session.role, permission);
+  if (!membership) return session.role === "platform_admin" && can(session.role, permission);
+  return can(membership.role as AppSession["role"], permission);
 }
 
 export async function requireAppPermission(permission: string, organizationId?: string) {
   return hasAppPermission(permission, organizationId);
+}
+
+function pickHighestRole(roles: UserRole[]) {
+  return rolePriority.find((role) => roles.includes(role));
 }

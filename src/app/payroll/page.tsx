@@ -8,22 +8,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { hasAppPermission } from "@/lib/auth/session";
 import { monthLabel } from "@/lib/format";
 import { getOrganizations, getPayrollRuns } from "@/lib/supabase/data";
 
 export default async function PayrollPage() {
   const [organizations, payrollRuns] = await Promise.all([getOrganizations(), getPayrollRuns()]);
+  const creatableOrganizations = [];
+  for (const organization of organizations) {
+    if (await hasAppPermission("payroll:calculate", organization.id)) creatableOrganizations.push(organization);
+  }
 
   return (
     <AppShell title="Payroll runs" description="Calculate, review, approve, lock, generate payslips, and mark payroll as paid." requiredPermission="payroll:read">
-      <Card className="mb-6">
+      {creatableOrganizations.length ? <Card className="mb-6">
         <CardHeader><CardTitle>Create payroll run</CardTitle></CardHeader>
         <CardContent>
           <ActionForm action={createPayrollRunAction} className="grid gap-4 md:grid-cols-[1fr_1fr_auto]" submitLabel="Create run">
             <div className="space-y-2">
               <Label htmlFor="organizationId">Company</Label>
-              <select className="h-9 rounded-md border bg-background px-3 text-sm" id="organizationId" name="organizationId" defaultValue={organizations[0]?.id}>
-                {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+              <select className="h-9 rounded-md border bg-background px-3 text-sm" id="organizationId" name="organizationId" defaultValue={creatableOrganizations[0]?.id}>
+                {creatableOrganizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
               </select>
             </div>
             <div className="space-y-2">
@@ -32,7 +37,7 @@ export default async function PayrollPage() {
             </div>
           </ActionForm>
         </CardContent>
-      </Card>
+      </Card> : null}
       <Card>
         <CardHeader><CardTitle>Monthly runs</CardTitle></CardHeader>
         <CardContent>

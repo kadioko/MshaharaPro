@@ -20,6 +20,14 @@ Use this document after every major build pass to decide what to work on next.
 - Report template notes and accountant review packet
 - Optional Sentry-compatible monitoring hook
 - Snippe checkout session creation and webhook subscription activation scaffolding
+- Billing history and failed-payment handling scaffolding
+- Employee bulk import validation preview and sample CSV support
+- Report export history, template review status, and storage-link download flows
+- Platform admin tenant health and subscription activity view
+- Help center pages and role-specific onboarding guidance
+- Supabase free-plan keep-alive cron
+- API-level auth/RBAC hardening for payslips and reports
+- Dependency refresh and documentation sweep
 
 ## Role Smoke Tests
 
@@ -55,44 +63,39 @@ Test this path:
 
 ## Next Upgrade Ideas
 
-### 1. Snippe Billing Hardening
+### 1. Live Supabase Finish
 
-- Apply `supabase/billing_subscriptions.sql`
-- Add Snippe env vars in Vercel
+- Apply `supabase/security_hardening.sql` after a fresh CLI login
+- Apply `supabase/billing_subscriptions.sql` on any environment missing billing tables
+- Verify seeded organizations, memberships, employees, rules, and payroll runs
+- Run role-by-role RLS verification with real Supabase users
+
+### 2. Snippe Billing Hardening
+
+- Add Snippe env vars in Vercel Production and Preview as needed
 - Configure Snippe webhook URL
 - Create a test checkout and verify webhook activation
-- Add billing history table
-- Add payment failure handling and retry messaging
-
-### 2. Workflow Polish
-
-- Add approval comment templates for common accountant review notes
-- Add an explicit approver-facing unlock approval/deny queue
-- Add payroll variance thresholds and warnings when gross/net changes exceed a configured percentage
-- Add bulk employee import with validation preview
+- Trigger or simulate failed payment handling
+- Confirm retry-link UX with real Snippe links
 
 ### 3. Report Finalization
 
 - Accountant sign-off on PAYE, NSSF, WCF, SDL templates
 - Template version locking by effective date
-- Reviewed / Draft / Needs review badges
 - Company logo and letterhead on PDF reports
-- Export history table with storage links
+- Final filing-format review against current TRA/NSSF/WCF/SDL expectations
 
 ### 4. SaaS Admin Operations
 
-- Platform admin organization list
-- Subscription status dashboard
-- Tenant health checklist
 - Support diagnostics without exposing unnecessary payroll data
-- Monitoring dashboard and release checklist
+- Production monitoring dashboard and alerting thresholds
+- Customer support runbook
 
 ### 5. Customer Onboarding Assets
 
-- Sample employee import CSV
 - Payroll setup checklist PDF
 - Accountant pilot onboarding script
-- Help center pages for each role
+- Short product walkthrough videos
 
 ## Production Readiness
 
@@ -103,8 +106,10 @@ Before launch:
 - Set `SENTRY_DSN` or enable Vercel Observability
 - Set `SNIPPE_API_KEY` and `SNIPPE_WEBHOOK_SECRET`
 - Apply `supabase/billing_subscriptions.sql`
+- Apply `supabase/security_hardening.sql`
 - Run `npm run verify`
 - Run `npm run supabase:verify-rls`
+- Run `SMOKE_BASE_URL=https://your-domain.example npm run smoke:prod`
 - Deploy to Vercel
 - Test live login for all roles
 - Generate a payslip and export one report in production

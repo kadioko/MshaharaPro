@@ -44,6 +44,10 @@ Set environment variables in Vercel dashboard:
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` - Your Supabase publishable key
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anon key
 - `SUPABASE_SERVICE_ROLE_KEY` - Server-only key for storage/report/payslip writes
+- `SUPABASE_PROJECT_REF` - Supabase project ref for operational scripts
+- `CRON_SECRET` - Secret used by Vercel Cron for the Supabase keep-alive route
+- `ENABLE_DEMO_ACCOUNTS=false` - Keep demo login disabled in production
+- `NEXT_PUBLIC_ENABLE_DEMO_ACCOUNTS=false` - Hide demo login shortcuts in production
 - `SNIPPE_API_KEY` - Server-only Snippe API key for hosted checkout sessions
 - `SNIPPE_WEBHOOK_SECRET` - Server-only Snippe webhook signing key
 
@@ -56,6 +60,10 @@ NEXT_PUBLIC_SUPABASE_URL=your-project-url
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SUPABASE_PROJECT_REF=your-project-ref
+CRON_SECRET=your-random-cron-secret
+ENABLE_DEMO_ACCOUNTS=false
+NEXT_PUBLIC_ENABLE_DEMO_ACCOUNTS=false
 SNIPPE_API_KEY=your-snippe-api-key
 SNIPPE_WEBHOOK_SECRET=your-snippe-webhook-secret
 ```
@@ -71,6 +79,7 @@ node scripts/run-supabase-cli.mjs link --project-ref your-project-ref
 node scripts/run-supabase-cli.mjs db query --linked --file supabase/schema.sql
 node scripts/run-supabase-cli.mjs db query --linked --file supabase/rls_employee_portal.sql
 node scripts/run-supabase-cli.mjs db query --linked --file supabase/billing_subscriptions.sql
+node scripts/run-supabase-cli.mjs db query --linked --file supabase/security_hardening.sql
 npm run supabase:seed-data
 npm run supabase:verify-rls
 ```
@@ -78,6 +87,7 @@ npm run supabase:verify-rls
 Important files:
 
 - `supabase/schema.sql`: multi-tenant PostgreSQL schema, indexes, and RLS policies
+- `supabase/security_hardening.sql`: idempotent production hardening patch for sensitive membership/report policies
 - `supabase/seed.sql`: initial statutory rules and two sample organizations
 - `scripts/seed-supabase-data.ts`: repeatable live Supabase seed for organizations, memberships, employees, payroll data, rules, and audit logs
 - `scripts/verify-supabase-rls.ts`: role-by-role RLS verification against real Supabase Auth sessions
@@ -134,7 +144,8 @@ Do not treat these values as final statutory advice.
 ## Tests
 
 ```bash
-npm test
+npm run verify
+npm run supabase:verify-rls
 ```
 
 Coverage includes:
@@ -144,6 +155,13 @@ Coverage includes:
 - SDL applicability
 - Net pay behavior
 - Role permission helpers
+- Schema/RLS policy assertions
+
+## Dependency maintenance
+
+Compatible app dependencies were refreshed in July 2026. ESLint is intentionally kept on the latest supported v9 line because the current Next.js ESLint integration is not compatible with ESLint v10 yet.
+
+`npm audit` may report a moderate advisory through Next.js' bundled `postcss` dependency. Do not run `npm audit fix --force` for that advisory because npm currently proposes downgrading Next.js to an obsolete major version. Track the upstream Next.js patch instead.
 
 ## Known limitations
 
@@ -152,4 +170,5 @@ Coverage includes:
 - Statutory payroll rules must be reviewed, configured, and maintained by a qualified local expert before any submission.
 - Final statutory report templates should be reviewed against current TRA/NSSF/WCF/SDL filing formats before production submission.
 - Production monitoring should be connected before launch.
+- Apply `supabase/security_hardening.sql` to every live Supabase project after a fresh schema rebuild.
 - Payroll calculations should be reviewed by a qualified accountant or tax advisor before submission.

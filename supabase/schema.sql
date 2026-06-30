@@ -345,7 +345,14 @@ create policy "Members can read memberships" on organization_members for select 
   has_org_role(organization_id, array['platform_admin','accountant','company_owner','payroll_manager']::app_role[])
   or user_id = auth.uid()
 );
-create policy "Users can create their owner membership" on organization_members for insert with check (user_id = auth.uid() and role in ('company_owner', 'accountant'));
+create policy "Users can create first owner membership" on organization_members for insert with check (
+  user_id = auth.uid()
+  and role = 'company_owner'
+  and not exists (
+    select 1 from organization_members existing
+    where existing.organization_id = organization_members.organization_id
+  )
+);
 
 create policy "Payroll staff can read employees" on employees for select using (
   has_org_role(organization_id, array['platform_admin','accountant','company_owner','payroll_manager']::app_role[])
@@ -385,6 +392,11 @@ create policy "Report staff can read reports" on reports for select using (
   has_org_role(organization_id, array['platform_admin','accountant','company_owner','payroll_manager']::app_role[])
 );
 create policy "Report exporters can create reports" on reports for insert with check (has_org_role(organization_id, array['platform_admin','accountant','company_owner','payroll_manager']::app_role[]));
+create policy "Report exporters can update report review status" on reports for update using (
+  has_org_role(organization_id, array['platform_admin','accountant','company_owner','payroll_manager']::app_role[])
+) with check (
+  has_org_role(organization_id, array['platform_admin','accountant','company_owner','payroll_manager']::app_role[])
+);
 
 create policy "Payroll staff can read documents" on documents for select using (
   has_org_role(organization_id, array['platform_admin','accountant','company_owner','payroll_manager']::app_role[])

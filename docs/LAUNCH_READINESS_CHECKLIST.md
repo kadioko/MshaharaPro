@@ -7,13 +7,19 @@
 
 ```bash
 node scripts/run-supabase-cli.mjs db query --linked --file supabase/billing_subscriptions.sql
+node scripts/run-supabase-cli.mjs db query --linked --file supabase/security_hardening.sql
 ```
 
 - Set Vercel Production and Preview env vars for Supabase, Snippe, and monitoring.
+- Set `CRON_SECRET` in Vercel Production so the Supabase keep-alive cron can run securely.
+- Keep `ENABLE_DEMO_ACCOUNTS` and `NEXT_PUBLIC_ENABLE_DEMO_ACCOUNTS` unset or `false` in production.
 - Configure Snippe webhook URL: `/api/snippe/webhook`.
 - Run `npm run verify`.
 - Run `npm run supabase:verify-rls`.
+- Apply `supabase/security_hardening.sql` after any fresh database reset or schema rebuild.
 - Run `SMOKE_BASE_URL=https://your-domain.example npm run smoke:prod`.
+- Confirm Vercel Cron logs show `/api/cron/supabase-keepalive` returning `200`.
+- Review `npm audit` output. Do not use `npm audit fix --force` if it proposes downgrading Next.js.
 
 ## Manual role QA
 

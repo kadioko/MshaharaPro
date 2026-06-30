@@ -76,6 +76,9 @@ or set a fresh temporary `SUPABASE_ACCESS_TOKEN`, then revoke it after use.
 7. Confirm Snippe sends `payment.completed` to `/api/snippe/webhook`.
 8. Confirm subscription status becomes `active`.
 9. Check audit logs for `Snippe webhook payment.completed`.
+10. Confirm billing history shows the payment event for the organization.
+11. Trigger or simulate a failed payment event and confirm retry messaging appears.
+12. Confirm the checkout quantity matches the selected plan seats.
 
 ## Security Notes
 

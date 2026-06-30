@@ -1,6 +1,6 @@
 import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
 import { writeAuditLog } from "@/lib/supabase/audit";
-import { getCurrentSession } from "@/lib/auth/session";
+import { getCurrentSession, hasAppPermission } from "@/lib/auth/session";
 import { calculatePayrollRun } from "@/lib/payroll/calculator";
 import { money } from "@/lib/format";
 import { getEmployees, getOrganizations, getPayrollRunItems, getPayrollRuns, getStatutoryRules } from "@/lib/supabase/data";
@@ -11,6 +11,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const runId = new URL(request.url).searchParams.get("run");
   const session = await getCurrentSession();
+  if (!session) return Response.json({ error: "Authentication required." }, { status: 401 });
   const [employees, organizations, payrollRuns, rules, persistedItems] = await Promise.all([
     getEmployees(),
     getOrganizations(),
@@ -20,12 +21,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   ]);
   const employee = employees.find((item) => item.id === id);
   if (!employee) return Response.json({ error: "Payslip employee not found." }, { status: 404 });
-  if (session?.role === "employee" && employee.email !== session.email) {
+  if (session.role === "employee" && employee.email !== session.email) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
   const organization = organizations.find((item) => item.id === employee.organizationId);
   if (!organization) return Response.json({ error: "Payslip organization not found." }, { status: 404 });
   const run = payrollRuns.find((item) => item.id === runId);
+  if (runId && !run) return Response.json({ error: "Payroll run not found." }, { status: 404 });
+  if (runId && run && run.organizationId !== organization.id) {
+    return Response.json({ error: "Payroll run does not belong to this employee organization." }, { status: 400 });
+  }
+  if (session.role !== "employee") {
+    const allowed = await hasAppPermission("payroll:read", organization.id);
+    if (!allowed) return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
   const item = persistedItems.find((lineItem) => lineItem.employeeId === employee.id) ?? calculatePayrollRun(organization, [employee], [], rules)[0];
   const payrollMonth = run?.month ?? "2026-04";
   const chunks: Buffer[] = [];

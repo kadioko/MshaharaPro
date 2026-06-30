@@ -2,6 +2,8 @@
 
 Verified test accounts for development and testing.
 
+Demo login shortcuts are disabled in production unless both `ENABLE_DEMO_ACCOUNTS=true` and `NEXT_PUBLIC_ENABLE_DEMO_ACCOUNTS=true` are set. Keep those flags off for the real production app.
+
 ## Demo Organizations
 
 ### Safari Ledger Co.
@@ -104,10 +106,10 @@ MshaharaPro2026!
 5. Submit for approval
 
 ### 2. Payslip Generation
-```bash
-curl https://mshaharapro-backend-production.up.railway.app/api/payslips/emp-001 \
-  --output payslip-emp-001.pdf
-```
+1. Login as `payroll@safariledger.co.tz` or `accountant@safariledger.co.tz`.
+2. Open a payroll run.
+3. Click the selected employee payslip download button.
+4. Confirm the PDF downloads from the authenticated Next.js payslip route.
 
 ### 3. Compliance Check
 1. Login as `accountant@safariledger.co.tz`
@@ -123,20 +125,12 @@ curl https://mshaharapro-backend-production.up.railway.app/api/payslips/emp-001 
 
 ## API Test Examples
 
-### Health Check
-```bash
-curl https://mshaharapro-backend-production.up.railway.app/health
-```
+The active API runs inside Next.js. API routes require a browser session or valid Supabase-authenticated request context.
 
-### Generate Payslip
-```bash
-# For emp-001 (Asha Mtemvu)
-curl https://mshaharapro-backend-production.up.railway.app/api/payslips/emp-001 \
-  -o asha-mtemvu-payslip.pdf
+### Production Smoke Test
 
-# For emp-006 (Joseph Mwita)
-curl https://mshaharapro-backend-production.up.railway.app/api/payslips/emp-006 \
-  -o joseph-mwita-payslip.pdf
+```bash
+SMOKE_BASE_URL=https://your-domain.example npm run smoke:prod
 ```
 
 ---

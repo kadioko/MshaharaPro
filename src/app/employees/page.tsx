@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { hasAppPermission } from "@/lib/auth/session";
+import { employeeImportSampleCsv } from "@/lib/employees/bulk-import";
 import { money } from "@/lib/format";
 import { getEmployees, getOrganizations } from "@/lib/supabase/data";
 
@@ -67,5 +69,3 @@ export default async function EmployeesPage() {
     </AppShell>
   );
 }
-import { hasAppPermission } from "@/lib/auth/session";
-import { employeeImportSampleCsv } from "@/lib/employees/bulk-import";

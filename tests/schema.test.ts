@@ -37,4 +37,11 @@ describe("supabase schema", () => {
     expect(schema).toContain("snippe_session_reference");
     expect(schema).toContain("Owners and accountants can manage subscriptions");
   });
+
+  it("hardens membership creation and report review updates", () => {
+    expect(schema).toContain("Users can create first owner membership");
+    expect(schema).toContain("not exists");
+    expect(schema).not.toContain("Users can create their owner membership");
+    expect(schema).toContain("Report exporters can update report review status");
+  });
 });
